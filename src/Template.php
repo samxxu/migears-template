@@ -10,7 +10,7 @@ namespace MiGears\Template;
  * - Native PHP syntax, zero DSL to learn
  * - Optional {{ }} syntax sugar (auto-compiled to PHP)
  * - Auto-escaping for safe output
- * - Layout inheritance (extends/section/yield)
+ * - Layout inheritance (extends/start/section)
  * - View components
  * - Multiple template paths (theme support)
  *
@@ -27,7 +27,7 @@ namespace MiGears\Template;
  *   <?= $this->e($name) ?>            escaped output
  *   <?= $this->raw($trustedHtml) ?>   raw output
  *   <?php $this->extends('layout/main') ?>
- *   <?php $this->section('content') ?> ... <?php $this->endSection() ?>
+ *   <?php $this->start('content') ?> ... <?php $this->end() ?>
  *   <?= $this->component('card', ['title' => 'Hi']) ?>
  */
 class Template
@@ -121,7 +121,7 @@ class Template
             if ($layoutFile === null) {
                 throw new \RuntimeException("Layout template not found: {$this->layout}");
             }
-            // The layout uses yield() to output sections
+            // The layout uses section() to output sections
             $content = $this->evaluate($layoutFile, $data);
         }
 
@@ -168,9 +168,9 @@ class Template
 
     /**
      * Start capturing a named section.
-     * Must be paired with endSection().
+     * Must be paired with end().
      */
-    public function section(string $name): void
+    public function start(string $name): void
     {
         $this->sectionStack[] = $name;
         ob_start();
@@ -179,10 +179,10 @@ class Template
     /**
      * End the current section and store its content.
      */
-    public function endSection(): void
+    public function end(): void
     {
         if ($this->sectionStack === []) {
-            throw new \RuntimeException('endSection() called without a matching section()');
+            throw new \RuntimeException('end() called without a matching start()');
         }
         $name = array_pop($this->sectionStack);
         $this->sections[$name] = ob_get_clean();
@@ -192,7 +192,7 @@ class Template
      * Output the content of a named section.
      * Returns default value if section was not defined.
      */
-    public function yield(string $name, string $default = ''): string
+    public function section(string $name, string $default = ''): string
     {
         return $this->sections[$name] ?? $default;
     }

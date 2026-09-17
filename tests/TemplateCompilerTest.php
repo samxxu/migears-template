@@ -85,16 +85,16 @@ class TemplateCompilerTest extends TestCase
 
     // --- {{ section('name') }} ---
 
-    public function testSectionYield(): void
+    public function testSectionOutput(): void
     {
         $result = $this->compiler->compile('{{ section("content") }}');
-        $this->assertSame("<?= \$this->yield('content') ?>", $result);
+        $this->assertSame("<?= \$this->section('content') ?>", $result);
     }
 
-    public function testSectionYieldSingleQuotes(): void
+    public function testSectionOutputSingleQuotes(): void
     {
         $result = $this->compiler->compile("{{ section('sidebar') }}");
-        $this->assertSame("<?= \$this->yield('sidebar') ?>", $result);
+        $this->assertSame("<?= \$this->section('sidebar') ?>", $result);
     }
 
     // --- Native PHP preserved ---

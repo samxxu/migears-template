@@ -83,7 +83,7 @@ class TemplateTest extends TestCase
 
     // --- Layout inheritance ---
 
-    public function testLayoutExtendsAndYield(): void
+    public function testLayoutExtendsAndSection(): void
     {
         $html = $this->tpl->render('profile', [
             'name' => 'Bob',
@@ -107,7 +107,7 @@ class TemplateTest extends TestCase
         $this->assertStringContainsString('<p>Trusted bio</p>', $html);
     }
 
-    public function testYieldWithDefaultValue(): void
+    public function testSectionWithDefaultValue(): void
     {
         $tpl = new Template($this->fixtures);
         $html = $tpl->render('layout/main');
@@ -212,15 +212,15 @@ class TemplateTest extends TestCase
         $this->assertInstanceOf(Template::class, $tpl);
     }
 
-    // --- endSection without section ---
+    // --- end without start ---
 
-    public function testEndSectionWithoutSectionThrows(): void
+    public function testEndWithoutStartThrows(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('endSection() called');
+        $this->expectExceptionMessage('end() called without a matching start()');
 
         $tpl = new Template($this->fixtures);
-        $tpl->endSection();
+        $tpl->end();
     }
 
     // --- {{ }} syntax sugar (.tpl.php files) ---

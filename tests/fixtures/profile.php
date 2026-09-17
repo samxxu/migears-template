@@ -1,11 +1,11 @@
 <?php $this->extends('layout/main') ?>
 
-<?php $this->section('title') ?>
+<?php $this->start('title') ?>
     Hello, <?= $this->e($name) ?>
-<?php $this->endSection() ?>
+<?php $this->end() ?>
 
-<?php $this->section('content') ?>
+<?php $this->start('content') ?>
     <h2>Profile of <?= $this->e($name) ?></h2>
     <p>Age: <?= $age ?></p>
     <?= $this->raw($bio) ?>
-<?php $this->endSection() ?>
+<?php $this->end() ?>

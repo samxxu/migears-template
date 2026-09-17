@@ -10,7 +10,7 @@ namespace MiGears\Template;
  * Rules:
  *   {{{ $expr }}}  →  <?= $this->raw($expr) ?>        Raw output (no escaping)
  *   {{ $expr }}    →  <?= $this->e($expr) ?>          Escaped output
- *   {{ section('name') }}  →  <?= $this->yield('name') ?>  Section output
+ *   {{ section('name') }}  →  <?= $this->section('name') ?>  Section output
  *
  * Native PHP tags <?php ?> and <?= ?> are preserved as-is.
  * Control structures (if/foreach/for/while) should use native PHP syntax.
@@ -37,9 +37,9 @@ class TemplateCompiler
             '/\{\{\s*(.+?)\s*\}\}/s',
             function (array $m): string {
                 $expr = $m[1];
-                // {{ section('name') }} → yield('name')
-                if (preg_match('/^section\(\s*["\'](.+?)["\']\s*\)$/i', $expr, $yieldMatch)) {
-                    return "<?= \$this->yield('{$yieldMatch[1]}') ?>";
+                // {{ section('name') }} → section('name')
+                if (preg_match('/^section\(\s*["\'](.+?)["\']\s*\)$/i', $expr, $secMatch)) {
+                    return "<?= \$this->section('{$secMatch[1]}') ?>";
                 }
                 return "<?= \$this->e({$expr}) ?>";
             },

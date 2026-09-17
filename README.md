@@ -11,7 +11,7 @@ PHP itself is already a template language. miGears Template adds just a few thin
 - **Native PHP syntax** — zero DSL, zero learning curve
 - **Optional `{{ }}` syntax** — auto-compiled to PHP, for cleaner output syntax
 - **Auto-escaping** — `$this->e()` / `{{ $var }}` for safe HTML output, XSS protection by default
-- **Layout inheritance** — `extends()` / `section()` / `yield()`, like Blade but simpler
+- **Layout inheritance** — `extends()` / `start()` / `section()`, like Blade but simpler
 - **View components** — reusable UI fragments with isolated scope
 - **Multiple template paths** — theme support, override by adding paths
 - **Zero dependencies** — just PHP 8.1+
@@ -71,7 +71,7 @@ Use `.tpl.php` extension for the `{{ }}` syntax — auto-compiled to pure PHP at
 |--------|-------------|-------------|
 | `{{ $expr }}` | `<?= $this->e($expr) ?>` | Escaped output (auto HTML-escaping) |
 | `{{{ $expr }}}` | `<?= $this->raw($expr) ?>` | Raw output (no escaping, for trusted HTML) |
-| `{{ section('name') }}` | `<?= $this->yield('name') ?>` | Output a section |
+| `{{ section('name') }}` | `<?= $this->section('name') ?>` | Output a section |
 
 Control structures (`if`, `foreach`, `for`, `while`) use **native PHP tags** — this preserves IDE syntax highlighting, auto-completion, and error checking.
 
@@ -125,12 +125,12 @@ php vendor/bin/compile.php views/ cache/
 <!DOCTYPE html>
 <html>
 <head>
-    <title><?= $this->yield('title', 'Default Title') ?></title>
+    <title><?= $this->section('title', 'Default Title') ?></title>
 </head>
 <body>
     <header>My App</header>
     <main>
-        <?= $this->yield('content') ?>
+        <?= $this->section('content') ?>
     </main>
     <footer>© 2026</footer>
 </body>
@@ -141,14 +141,14 @@ php vendor/bin/compile.php views/ cache/
 <!-- views/user/profile.php — child template -->
 <?php $this->extends('layout/main') ?>
 
-<?php $this->section('title') ?>
+<?php $this->start('title') ?>
     Profile of <?= $this->e($name) ?>
-<?php $this->endSection() ?>
+<?php $this->end() ?>
 
-<?php $this->section('content') ?>
+<?php $this->start('content') ?>
     <h2><?= $this->e($name) ?></h2>
     <p>Age: <?= $age ?></p>
-<?php $this->endSection() ?>
+<?php $this->end() ?>
 ```
 
 ### View Components
@@ -187,9 +187,9 @@ Templates are searched in reverse order of `addPath()` calls. First match wins.
 | `e(mixed $value): string` | Escape for HTML output |
 | `raw(string $html): string` | Output raw HTML (trust required) |
 | `extends(string $layout): void` | Set layout template |
-| `section(string $name): void` | Start capturing a section |
-| `endSection(): void` | End current section |
-| `yield(string $name, string $default = ''): string` | Output section content |
+| `start(string $name): void` | Start capturing a section |
+| `end(): void` | End current section |
+| `section(string $name, string $default = ''): string` | Output section content |
 | `component(string $name, array $data = []): string` | Render a component |
 | `addPath(string $path): self` | Add template directory |
 | `setAutoEscape(bool $enabled): self` | Toggle auto-escaping (on by default) |
@@ -248,7 +248,7 @@ PHP 本身就是模板语言。miGears Template 只在之上加了几件事：**
 - **原生 PHP 语法** — 零 DSL、零学习成本
 - **可选 `{{ }}` 语法** — 自动编译为 PHP，输出语法更简洁
 - **自动转义** — `$this->e()` / `{{ $var }}` 安全输出 HTML，默认防 XSS
-- **布局继承** — `extends()` / `section()` / `yield()`，类似 Blade 但更简单
+- **布局继承** — `extends()` / `start()` / `section()`，类似 Blade 但更简单
 - **视图组件** — 可复用 UI 片段，作用域隔离
 - **多模板目录** — 支持主题，通过添加路径覆盖模板
 - **零依赖** — 只需要 PHP 8.1+
@@ -308,7 +308,7 @@ echo $tpl->render('user/profile', [
 |------|---------|------|
 | `{{ $expr }}` | `<?= $this->e($expr) ?>` | 转义输出（自动 HTML 转义） |
 | `{{{ $expr }}}` | `<?= $this->raw($expr) ?>` | 原始输出（不转义，用于信任的 HTML） |
-| `{{ section('name') }}` | `<?= $this->yield('name') ?>` | 输出区块 |
+| `{{ section('name') }}` | `<?= $this->section('name') ?>` | 输出区块 |
 
 控制结构（`if`、`foreach`、`for`、`while`）使用**原生 PHP 标签** — 保留 IDE 语法高亮、自动补全和错误检查。
 
@@ -350,12 +350,12 @@ php vendor/bin/compile.php views/ cache/
 <!DOCTYPE html>
 <html>
 <head>
-    <title><?= $this->yield('title', '默认标题') ?></title>
+    <title><?= $this->section('title', '默认标题') ?></title>
 </head>
 <body>
     <header>我的应用</header>
     <main>
-        <?= $this->yield('content') ?>
+        <?= $this->section('content') ?>
     </main>
     <footer>© 2026</footer>
 </body>
@@ -366,14 +366,14 @@ php vendor/bin/compile.php views/ cache/
 <!-- views/user/profile.php — 子模板 -->
 <?php $this->extends('layout/main') ?>
 
-<?php $this->section('title') ?>
+<?php $this->start('title') ?>
     <?= $this->e($name) ?> 的个人资料
-<?php $this->endSection() ?>
+<?php $this->end() ?>
 
-<?php $this->section('content') ?>
+<?php $this->start('content') ?>
     <h2><?= $this->e($name) ?></h2>
     <p>年龄：<?= $age ?></p>
-<?php $this->endSection() ?>
+<?php $this->end() ?>
 ```
 
 ### 视图组件
@@ -412,9 +412,9 @@ $tpl->addPath(__DIR__ . '/themes/dark');  // 优先查找
 | `e(mixed $value): string` | HTML 转义输出 |
 | `raw(string $html): string` | 原始 HTML 输出（需信任内容） |
 | `extends(string $layout): void` | 设置布局模板 |
-| `section(string $name): void` | 开始捕获区块 |
-| `endSection(): void` | 结束当前区块 |
-| `yield(string $name, string $default = ''): string` | 输出区块内容 |
+| `start(string $name): void` | 开始捕获区块 |
+| `end(): void` | 结束当前区块 |
+| `section(string $name, string $default = ''): string` | 输出区块内容 |
 | `component(string $name, array $data = []): string` | 渲染组件 |
 | `addPath(string $path): self` | 添加模板目录 |
 | `setAutoEscape(bool $enabled): self` | 切换自动转义（默认开启） |

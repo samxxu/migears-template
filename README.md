@@ -99,6 +99,10 @@ php vendor/bin/compile.php views/hello.tpl.php cache/hello.php
 php vendor/bin/compile.php views/ cache/
 ```
 
+- Exit code: `0` on success, `1` on any failure; `--help` prints this usage
+- An unrecognised `-`/`--option` is refused before anything is read, so a mistyped option can no longer land in the `<cache-dir>` position and write the compiled files into a directory named after it
+- A missing composer autoloader and an unwritable target are named rather than ending in an uncaught fatal, or in a "Compiled to:" line for a file that was never written
+
 ### Auto-Escaping
 
 ```php
@@ -329,6 +333,10 @@ php vendor/bin/compile.php views/hello.tpl.php cache/hello.php
 # 编译目录下所有 .tpl.php 文件
 php vendor/bin/compile.php views/ cache/
 ```
+
+- 退出码：成功 `0`，任一失败 `1`；`--help` 打印用法
+- 未识别的 `-`/`--option` 在读取任何东西之前即被拒绝，拼错的选项不会再落到 `<cache-dir>` 位上、把编译产物写进以它命名的目录
+- 缺 composer autoloader、目标不可写都会被点名，而不是以未捕获致命错误收场，或对根本没写成的文件打印 "Compiled to:"
 
 ### 自动转义
 

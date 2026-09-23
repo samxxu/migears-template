@@ -6,6 +6,10 @@ Minimalist PHP template engine — native PHP with optional `## ##` syntax sugar
 
 PHP itself is already a template language. miGears Template adds just a few things on top: **auto-escaping**, **layout inheritance**, **view components**, and optional **`## ##` syntax sugar** that compiles to pure PHP.
 
+> **Background**: miGears is the open-source successor of **TinyGears**, a
+> self-developed PHP framework. It was renamed and open-sourced recently because
+> the name *TinyGears* is already taken in the open-source community.
+
 ## Features
 
 - **Native PHP syntax** — zero DSL, zero learning curve

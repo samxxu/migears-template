@@ -8,7 +8,7 @@ namespace MiGears\Template;
  * Minimalist PHP template engine.
  *
  * - Native PHP syntax, zero DSL to learn
- * - Optional {{ }} syntax sugar (auto-compiled to PHP)
+ * - Optional ## ## syntax sugar (auto-compiled to PHP)
  * - Auto-escaping for safe output
  * - Layout inheritance (extends/start/section)
  * - View components
@@ -18,10 +18,10 @@ namespace MiGears\Template;
  *   $tpl = new Template(__DIR__ . '/views');
  *   echo $tpl->render('user/profile', ['name' => 'Alice']);
  *
- * In templates (.tpl.php files use {{ }} syntax):
- *   {{ $name }}                        escaped output
- *   {{{ $trustedHtml }}}              raw output
- *   {{ section('content') }}          section output
+ * In templates (.tpl.php files use ## ## syntax):
+ *   ## $name ##                        escaped output
+ *   ### $trustedHtml ###              raw output
+ *   ## section('content') ##          section output
  *
  * In templates (.php files use native PHP, fully backward compatible):
  *   <?= $this->e($name) ?>            escaped output
@@ -37,9 +37,6 @@ class Template
     /** @var list<string> Template directories, searched in order */
     private array $paths;
 
-    /** @var bool Whether auto-escaping is enabled */
-    private bool $autoEscape = true;
-
     /** @var string|null Layout template set by extends() */
     private ?string $layout = null;
 
@@ -49,7 +46,7 @@ class Template
     /** @var list<string> Stack of section names currently being captured */
     private array $sectionStack = [];
 
-    /** @var TemplateCompiler|null Lazy-init compiler for {{ }} syntax */
+    /** @var TemplateCompiler|null Lazy-init compiler for ## ## syntax */
     private ?TemplateCompiler $compiler = null;
 
     /** @var string|null Cache directory for compiled templates */
@@ -74,16 +71,6 @@ class Template
     public function addPath(string $path): self
     {
         array_unshift($this->paths, rtrim($path, '/\\'));
-        return $this;
-    }
-
-    /**
-     * Enable or disable auto-escaping globally.
-     * On by default. Turning off is not recommended.
-     */
-    public function setAutoEscape(bool $enabled): self
-    {
-        $this->autoEscape = $enabled;
         return $this;
     }
 

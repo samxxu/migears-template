@@ -202,14 +202,18 @@ class TemplateTest extends TestCase
         $this->tpl->render('error');
     }
 
-    // --- setAutoEscape ---
+    // --- escaping is a property of the syntax, not a runtime switch ---
 
-    public function testSetAutoEscapeOff(): void
+    public function testRawCallInsideSugarIsEscapedAnyway(): void
     {
-        $tpl = new Template($this->fixtures);
-        $tpl->setAutoEscape(false);
-        // Just verify the method exists and returns self
-        $this->assertInstanceOf(Template::class, $tpl);
+        // `## ##` always wraps its expression in $this->e(), so asking for raw
+        // inside it is a silent no-op: `### ###` is the raw form. This is the
+        // trap worth a test, because the two look almost identical.
+        $tpl = new Template($this->fixtures . '/syntax');
+        $html = $tpl->render('raw-trap', ['html' => '<strong>Bold</strong>']);
+
+        $this->assertStringNotContainsString('<strong>', $html);
+        $this->assertStringContainsString('&lt;strong&gt;', $html);
     }
 
     // --- end without start ---

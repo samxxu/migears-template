@@ -19,5 +19,8 @@
         "psr-4": {
             "MiGears\\Template\\Tests\\": "tests/"
         }
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }

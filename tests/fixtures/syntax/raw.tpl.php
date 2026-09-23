@@ -1,2 +1,2 @@
-<div class="content">{{{ $html }}}</div>
-<span>{{ $title }}</span>
+<div class="content">### $html ###</div>
+<span>## $title ##</span>

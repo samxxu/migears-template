@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace MiGears\Template;
 
 /**
- * Compiles {{ }} template syntax into pure PHP.
+ * Compiles ## ## template syntax into pure PHP.
  *
  * Rules:
- *   {{{ $expr }}}  →  <?= $this->raw($expr) ?>        Raw output (no escaping)
- *   {{ $expr }}    →  <?= $this->e($expr) ?>          Escaped output
- *   {{ section('name') }}  →  <?= $this->section('name') ?>  Section output
+ *   ### $expr ###  →  <?= $this->raw($expr) ?>        Raw output (no escaping)
+ *   ## $expr ##    →  <?= $this->e($expr) ?>          Escaped output
+ *   ## section('name') ##  →  <?= $this->section('name') ?>  Section output
+ *   \## … \##      →  literal ## (escaped hashes, left untouched by the rules above)
  *
  * Native PHP tags <?php ?> and <?= ?> are preserved as-is.
  * Control structures (if/foreach/for/while) should use native PHP syntax.
@@ -22,22 +23,36 @@ class TemplateCompiler
      */
     public function compile(string $source): string
     {
-        // Order matters: triple braces first, then double
-        // Otherwise {{ would match inside {{{ }}}
-
-        // {{{ $expr }}} — raw output (no HTML escaping)
+        // A backslash before a run of two or more hashes escapes it: \## is a literal
+        // ##, \### a literal ###. Mask those runs first — the passes below are text-level
+        // and would otherwise read them as output expressions.
+        $literals = [];
         $source = preg_replace_callback(
-            '/\{\{\{\s*(.+?)\s*\}\}\}/s',
+            '/\\\\(#{2,})/s',
+            function (array $m) use (&$literals): string {
+                $literals[] = $m[1];
+
+                return "\x00" . (count($literals) - 1) . "\x00";
+            },
+            $source
+        );
+
+        // Order matters: triple hashes first, then double
+        // Otherwise ## would match inside ### ###
+
+        // ### $expr ### — raw output (no HTML escaping)
+        $source = preg_replace_callback(
+            '/###\s*(.+?)\s*###/s',
             fn(array $m): string => "<?= \$this->raw({$m[1]}) ?>",
             $source
         );
 
-        // {{ $expr }} — escaped output
+        // ## $expr ## — escaped output
         $source = preg_replace_callback(
-            '/\{\{\s*(.+?)\s*\}\}/s',
+            '/##\s*(.+?)\s*##/s',
             function (array $m): string {
                 $expr = $m[1];
-                // {{ section('name') }} → section('name')
+                // ## section('name') ## → section('name')
                 if (preg_match('/^section\(\s*["\'](.+?)["\']\s*\)$/i', $expr, $secMatch)) {
                     return "<?= \$this->section('{$secMatch[1]}') ?>";
                 }
@@ -45,6 +60,10 @@ class TemplateCompiler
             },
             $source
         );
+
+        foreach ($literals as $index => $hashes) {
+            $source = str_replace("\x00{$index}\x00", $hashes, $source);
+        }
 
         return $source;
     }

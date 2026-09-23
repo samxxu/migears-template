@@ -16,84 +16,119 @@ class TemplateCompilerTest extends TestCase
         $this->compiler = new TemplateCompiler();
     }
 
-    // --- {{ }} escaped output ---
+    // --- \## literal hashes ---
+
+    public function testEscapedDoubleHashStaysLiteral(): void
+    {
+        $this->assertSame('## 说明 ##', $this->compiler->compile('\## 说明 \##'));
+    }
+
+    public function testEscapedTripleHashStaysLiteral(): void
+    {
+        $this->assertSame('### 详情 ###', $this->compiler->compile('\### 详情 \###'));
+    }
+
+    public function testEscapeWorksNextToRealInterpolation(): void
+    {
+        $this->assertSame(
+            '## 标题 ## | <?= $this->e($name) ?>',
+            $this->compiler->compile('\## 标题 \## | ## $name ##')
+        );
+    }
+
+    public function testEscapedHashInsidePhpCodeIsLeftAlone(): void
+    {
+        // The passes are text-level, so the escape works inside PHP source too — that is
+        // what lets a page compiler put a literal "##" into a generated string literal.
+        $this->assertSame(
+            "<?= \$this->component('card', ['title' => '## x ##']) ?>",
+            $this->compiler->compile("<?= \$this->component('card', ['title' => '\\## x \\##']) ?>")
+        );
+    }
+
+    public function testBackslashBeforeTheEscapeIsKept(): void
+    {
+        $this->assertSame('\##', $this->compiler->compile('\\\\##'));
+    }
+
+    // --- ## ## escaped output ---
 
     public function testVariableOutput(): void
     {
-        $result = $this->compiler->compile('{{ $name }}');
+        $result = $this->compiler->compile('## $name ##');
         $this->assertSame('<?= $this->e($name) ?>', $result);
     }
 
     public function testPropertyAccess(): void
     {
-        $result = $this->compiler->compile('{{ $user->name }}');
+        $result = $this->compiler->compile('## $user->name ##');
         $this->assertSame('<?= $this->e($user->name) ?>', $result);
     }
 
     public function testArrayAccess(): void
     {
-        $result = $this->compiler->compile('{{ $user["name"] }}');
+        $result = $this->compiler->compile('## $user["name"] ##');
         $this->assertSame('<?= $this->e($user["name"]) ?>', $result);
     }
 
     public function testMethodCall(): void
     {
-        $result = $this->compiler->compile('{{ $user->getName() }}');
+        $result = $this->compiler->compile('## $user->getName() ##');
         $this->assertSame('<?= $this->e($user->getName()) ?>', $result);
     }
 
     public function testChainedCall(): void
     {
-        $result = $this->compiler->compile('{{ $user->profile->name }}');
+        $result = $this->compiler->compile('## $user->profile->name ##');
         $this->assertSame('<?= $this->e($user->profile->name) ?>', $result);
     }
 
     public function testStringLiteral(): void
     {
-        $result = $this->compiler->compile('{{ "hello" }}');
+        $result = $this->compiler->compile('## "hello" ##');
         $this->assertSame('<?= $this->e("hello") ?>', $result);
     }
 
     public function testTernaryExpression(): void
     {
-        $result = $this->compiler->compile('{{ $name ?? "guest" }}');
+        $result = $this->compiler->compile('## $name ?? "guest" ##');
         $this->assertSame('<?= $this->e($name ?? "guest") ?>', $result);
     }
 
     public function testMultipleExpressionsOnSameLine(): void
     {
-        $result = $this->compiler->compile('<span>{{ $first }}</span> <span>{{ $last }}</span>');
+        $result = $this->compiler->compile('<span>## $first ##</span> <span>## $last ##</span>');
         $this->assertSame(
             '<span><?= $this->e($first) ?></span> <span><?= $this->e($last) ?></span>',
             $result
         );
     }
 
-    // --- {{{ }}} raw output ---
+    // --- ### ### raw output ---
 
     public function testRawOutput(): void
     {
-        $result = $this->compiler->compile('{{{ $html }}}');
+        $result = $this->compiler->compile('### $html ###');
         $this->assertSame('<?= $this->raw($html) ?>', $result);
     }
 
     public function testRawWithPropertyAccess(): void
     {
-        $result = $this->compiler->compile('{{{ $page->content }}}');
+        $result = $this->compiler->compile('### $page->content ###');
         $this->assertSame('<?= $this->raw($page->content) ?>', $result);
     }
 
-    // --- {{ section('name') }} ---
+    // --- ## section('name') ## ---
 
     public function testSectionOutput(): void
     {
-        $result = $this->compiler->compile('{{ section("content") }}');
+        $result = $this->compiler->compile('## section("content") ##');
         $this->assertSame("<?= \$this->section('content') ?>", $result);
     }
 
     public function testSectionOutputSingleQuotes(): void
     {
-        $result = $this->compiler->compile("{{ section('sidebar') }}");
+        $result = $this->compiler->compile("## section('sidebar') ##");
         $this->assertSame("<?= \$this->section('sidebar') ?>", $result);
     }
 
@@ -130,7 +165,7 @@ class TemplateCompilerTest extends TestCase
     public function testMixedNativeAndNewSyntax(): void
     {
         $source = '<?php foreach ($items as $item): ?>' . "\n" .
-                  '    <li>{{ $item->name }}</li>' . "\n" .
+                  '    <li>## $item->name ##</li>' . "\n" .
                   '<?php endforeach; ?>';
         $expected = '<?php foreach ($items as $item): ?>' . "\n" .
                    '    <li><?= $this->e($item->name) ?></li>' . "\n" .
@@ -141,7 +176,7 @@ class TemplateCompilerTest extends TestCase
 
     public function testRawAndEscapedOnSameLine(): void
     {
-        $result = $this->compiler->compile('{{ $title }} {{{ $body }}}');
+        $result = $this->compiler->compile('## $title ## ### $body ###');
         $this->assertSame('<?= $this->e($title) ?> <?= $this->raw($body) ?>', $result);
     }
 
@@ -149,19 +184,19 @@ class TemplateCompilerTest extends TestCase
 
     public function testWhitespaceInBraces(): void
     {
-        $result = $this->compiler->compile('{{  $name  }}');
+        $result = $this->compiler->compile('##  $name  ##');
         $this->assertSame('<?= $this->e($name) ?>', $result);
     }
 
     public function testNoSpacesInBraces(): void
     {
-        $result = $this->compiler->compile('{{$name}}');
+        $result = $this->compiler->compile('##$name##');
         $this->assertSame('<?= $this->e($name) ?>', $result);
     }
 
     public function testMultilineExpression(): void
     {
-        $source = "{{ \$user->profile\n    ->name }}";
+        $source = "## \$user->profile\n    ->name ##";
         $result = $this->compiler->compile($source);
         $this->assertStringContainsString('$this->e(', $result);
         $this->assertStringContainsString('$user->profile', $result);
@@ -172,7 +207,7 @@ class TemplateCompilerTest extends TestCase
     public function testCompileFile(): void
     {
         $tmpFile = tempnam(sys_get_temp_dir(), 'tpl_test_') . '.tpl.php';
-        file_put_contents($tmpFile, '<h1>{{ $title }}</h1>');
+        file_put_contents($tmpFile, '<h1>## $title ##</h1>');
 
         $result = $this->compiler->compileFile($tmpFile);
         $this->assertSame('<h1><?= $this->e($title) ?></h1>', $result);
@@ -191,7 +226,7 @@ class TemplateCompilerTest extends TestCase
     public function testCompileToCache(): void
     {
         $source = tempnam(sys_get_temp_dir(), 'tpl_src_') . '.tpl.php';
-        file_put_contents($source, '{{ $name }}');
+        file_put_contents($source, '## $name ##');
         $cacheDir = sys_get_temp_dir() . '/migears_test_cache_' . uniqid();
 
         $cachePath = $this->compiler->compileToCache($source, $cacheDir);
@@ -204,7 +239,7 @@ class TemplateCompilerTest extends TestCase
         $this->assertSame($cachePath, $cachePath2);
 
         // Modify source → should recompile
-        file_put_contents($source, '{{ $other }}');
+        file_put_contents($source, '## $other ##');
         // Ensure source mtime is strictly newer than cache
         touch($source, time() + 1);
         $cachePath3 = $this->compiler->compileToCache($source, $cacheDir);
@@ -281,5 +316,12 @@ class TemplateCompilerTest extends TestCase
         // JS object syntax should not be affected (no matching pattern)
         $result = $this->compiler->compile('var x = { a: 1 };');
         $this->assertSame('var x = { a: 1 };', $result);
+    }
+
+    public function testSingleHashNotTemplateSyntax(): void
+    {
+        // A lone # (CSS id, color hex) should not be compiled
+        $result = $this->compiler->compile('id="#main" color="#fff"');
+        $this->assertSame('id="#main" color="#fff"', $result);
     }
 }

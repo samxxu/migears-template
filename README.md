@@ -2,15 +2,15 @@
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 
-Minimalist PHP template engine — native PHP with optional `{{ }}` syntax sugar.
+Minimalist PHP template engine — native PHP with optional `## ##` syntax sugar.
 
-PHP itself is already a template language. miGears Template adds just a few things on top: **auto-escaping**, **layout inheritance**, **view components**, and optional **`{{ }}` syntax sugar** that compiles to pure PHP.
+PHP itself is already a template language. miGears Template adds just a few things on top: **auto-escaping**, **layout inheritance**, **view components**, and optional **`## ##` syntax sugar** that compiles to pure PHP.
 
 ## Features
 
 - **Native PHP syntax** — zero DSL, zero learning curve
-- **Optional `{{ }}` syntax** — auto-compiled to PHP, for cleaner output syntax
-- **Auto-escaping** — `$this->e()` / `{{ $var }}` for safe HTML output, XSS protection by default
+- **Optional `## ##` syntax** — auto-compiled to PHP, for cleaner output syntax
+- **Auto-escaping** — `$this->e()` / `## $var ##` for safe HTML output, XSS protection by default
 - **Layout inheritance** — `extends()` / `start()` / `section()`, like Blade but simpler
 - **View components** — reusable UI fragments with isolated scope
 - **Multiple template paths** — theme support, override by adding paths
@@ -53,14 +53,14 @@ Use `.php` extension for native PHP templates:
 
 ### Syntax Sugar (`.tpl.php` files)
 
-Use `.tpl.php` extension for the `{{ }}` syntax — auto-compiled to pure PHP at runtime:
+Use `.tpl.php` extension for the `## ##` syntax — auto-compiled to pure PHP at runtime:
 
 ```php
 <!-- views/hello.tpl.php -->
-<h1>Hello, {{ $name }}!</h1>
+<h1>Hello, ## $name ##!</h1>
 <ul>
 <?php foreach ($items as $item): ?>
-    <li>{{ $item }}</li>
+    <li>## $item ##</li>
 <?php endforeach ?>
 </ul>
 ```
@@ -69,9 +69,10 @@ Use `.tpl.php` extension for the `{{ }}` syntax — auto-compiled to pure PHP at
 
 | Syntax | Compiles to | Description |
 |--------|-------------|-------------|
-| `{{ $expr }}` | `<?= $this->e($expr) ?>` | Escaped output (auto HTML-escaping) |
-| `{{{ $expr }}}` | `<?= $this->raw($expr) ?>` | Raw output (no escaping, for trusted HTML) |
-| `{{ section('name') }}` | `<?= $this->section('name') ?>` | Output a section |
+| `## $expr ##` | `<?= $this->e($expr) ?>` | Escaped output (auto HTML-escaping) |
+| `### $expr ###` | `<?= $this->raw($expr) ?>` | Raw output (no escaping, for trusted HTML) |
+| `## section('name') ##` | `<?= $this->section('name') ?>` | Output a section |
+| `\## … \##` | literal `##` | Escaped hashes — a backslash before a run of two or more hashes keeps it literal |
 
 Control structures (`if`, `foreach`, `for`, `while`) use **native PHP tags** — this preserves IDE syntax highlighting, auto-completion, and error checking.
 
@@ -97,18 +98,6 @@ php vendor/bin/compile.php views/ cache/
 ### Auto-Escaping
 
 ```php
-<!-- views/hello.php -->
-<h1>Hello, <?= $this->e($name) ?>!</h1>
-<ul>
-<?php foreach ($items as $item): ?>
-    <li><?= $this->e($item) ?></li>
-<?php endforeach ?>
-</ul>
-```
-
-### Auto-Escaping
-
-```php
 // Escaped (safe for user input) — always use this by default
 <?= $this->e($userInput) ?>
 
@@ -117,6 +106,12 @@ php vendor/bin/compile.php views/ cache/
 ```
 
 `$this->e()` handles strings, numbers, null (returns empty string), and arrays/objects (JSON-encoded then escaped).
+
+Escaping is a property of the syntax you write, not a runtime switch: `## $expr ##` compiles to `$this->e($expr)`, `### $expr ###` to `$this->raw($expr)`, and a native `<?= $expr ?>` outputs exactly what you hand it. A global toggle is not offered — it would have to change what `## ##` means per render, which the compiled cache (keyed by source path alone) cannot express.
+
+Literal hashes are written with a backslash: `\##` compiles to a literal `##`, `\###` to `###`. Without it, a `##` in the source is read as an output expression — the pass is text-level and does not distinguish markup from PHP code.
+
+One trap follows: `## $this->raw($expr) ##` is **escaped anyway**, because the sugar wraps whatever sits inside in `$this->e()`, so the call is a silent no-op. For raw output write `### $expr ###` or native `<?= $this->raw($expr) ?>`.
 
 ### Layout Inheritance
 
@@ -192,7 +187,6 @@ Templates are searched in reverse order of `addPath()` calls. First match wins.
 | `section(string $name, string $default = ''): string` | Output section content |
 | `component(string $name, array $data = []): string` | Render a component |
 | `addPath(string $path): self` | Add template directory |
-| `setAutoEscape(bool $enabled): self` | Toggle auto-escaping (on by default) |
 | `setCacheDir(string $dir): self` | Set cache directory for compiled .tpl.php |
 | `getCompiler(): TemplateCompiler` | Get the compiler instance |
 
@@ -204,7 +198,7 @@ PHP is already a template engine. miGears Template provides just the essential t
 2. **Reuse** — layout inheritance and components reduce duplication
 3. **Simplicity** — you already know the syntax
 
-**`{{ }}` syntax sugar is optional** — it compiles to pure PHP, so you can always see what's happening. Use `.tpl.php` for cleaner output syntax, or `.php` for native PHP. Both work seamlessly together.
+**`## ##` syntax sugar is optional** — it compiles to pure PHP, so you can always see what's happening. Use `.tpl.php` for cleaner output syntax, or `.php` for native PHP. Both work seamlessly together.
 
 **What we don't do**:
 - No template-level DSL (no `{% if %}`, `{% foreach %}` — use native PHP tags)
@@ -239,15 +233,15 @@ MIT
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 
-极简 PHP 模板引擎 — 原生 PHP + 可选 `{{ }}` 语法糖。
+极简 PHP 模板引擎 — 原生 PHP + 可选 `## ##` 语法糖。
 
-PHP 本身就是模板语言。miGears Template 只在之上加了几件事：**自动转义**、**布局继承**、**视图组件**，以及可选的 **`{{ }}` 语法糖**（自动编译为纯 PHP）。
+PHP 本身就是模板语言。miGears Template 只在之上加了几件事：**自动转义**、**布局继承**、**视图组件**，以及可选的 **`## ##` 语法糖**（自动编译为纯 PHP）。
 
 ## 特性
 
 - **原生 PHP 语法** — 零 DSL、零学习成本
-- **可选 `{{ }}` 语法** — 自动编译为 PHP，输出语法更简洁
-- **自动转义** — `$this->e()` / `{{ $var }}` 安全输出 HTML，默认防 XSS
+- **可选 `## ##` 语法** — 自动编译为 PHP，输出语法更简洁
+- **自动转义** — `$this->e()` / `## $var ##` 安全输出 HTML，默认防 XSS
 - **布局继承** — `extends()` / `start()` / `section()`，类似 Blade 但更简单
 - **视图组件** — 可复用 UI 片段，作用域隔离
 - **多模板目录** — 支持主题，通过添加路径覆盖模板
@@ -290,14 +284,14 @@ echo $tpl->render('user/profile', [
 
 ### 语法糖（`.tpl.php` 文件）
 
-使用 `.tpl.php` 扩展名编写 `{{ }}` 语法 — 运行时自动编译为纯 PHP：
+使用 `.tpl.php` 扩展名编写 `## ##` 语法 — 运行时自动编译为纯 PHP：
 
 ```php
 <!-- views/hello.tpl.php -->
-<h1>你好，{{ $name }}！</h1>
+<h1>你好，## $name ##！</h1>
 <ul>
 <?php foreach ($items as $item): ?>
-    <li>{{ $item }}</li>
+    <li>## $item ##</li>
 <?php endforeach ?>
 </ul>
 ```
@@ -306,9 +300,10 @@ echo $tpl->render('user/profile', [
 
 | 语法 | 编译结果 | 说明 |
 |------|---------|------|
-| `{{ $expr }}` | `<?= $this->e($expr) ?>` | 转义输出（自动 HTML 转义） |
-| `{{{ $expr }}}` | `<?= $this->raw($expr) ?>` | 原始输出（不转义，用于信任的 HTML） |
-| `{{ section('name') }}` | `<?= $this->section('name') ?>` | 输出区块 |
+| `## $expr ##` | `<?= $this->e($expr) ?>` | 转义输出（自动 HTML 转义） |
+| `### $expr ###` | `<?= $this->raw($expr) ?>` | 原始输出（不转义，用于信任的 HTML） |
+| `## section('name') ##` | `<?= $this->section('name') ?>` | 输出区块 |
+| `\## … \##` | 字面 `##` | 转义井号——反斜杠加两个及以上井号，保持字面 |
 
 控制结构（`if`、`foreach`、`for`、`while`）使用**原生 PHP 标签** — 保留 IDE 语法高亮、自动补全和错误检查。
 
@@ -342,6 +337,12 @@ php vendor/bin/compile.php views/ cache/
 ```
 
 `$this->e()` 支持字符串、数字、null（返回空字符串）、数组/对象（JSON 编码后转义）。
+
+转义取决于你写下的语法，而不是运行期开关：`## $expr ##` 编译为 `$this->e($expr)`，`### $expr ###` 编译为 `$this->raw($expr)`，而原生 `<?= $expr ?>` 原样输出你给的东西。本引擎不提供全局开关——那会要求 `## ##` 的含义随渲染实例变化，而编译缓存只以源文件路径为键，表达不了这种差异。
+
+由此有一个坑：`## $this->raw($expr) ##` **仍会被转义**，因为糖会把里面的表达式整体包进 `$this->e()`，那次调用等于静默失效。要原样输出请写 `### $expr ###` 或原生 `<?= $this->raw($expr) ?>`。
+
+需要字面井号时在前面加反斜杠：`\##` 编译为字面 `##`，`\###` 为 `###`。不加反斜杠的 `##` 一律被当作输出表达式——这一层是按文本扫描的，不区分标记还是 PHP 代码。
 
 ### 布局继承
 
@@ -417,8 +418,7 @@ $tpl->addPath(__DIR__ . '/themes/dark');  // 优先查找
 | `section(string $name, string $default = ''): string` | 输出区块内容 |
 | `component(string $name, array $data = []): string` | 渲染组件 |
 | `addPath(string $path): self` | 添加模板目录 |
-| `setAutoEscape(bool $enabled): self` | 切换自动转义（默认开启） |
-| `setCacheDir(string $dir): self` | 设置 .tpl.php 编译缓存目录 |
+| `setCacheDir(string $dir): self` | 设置 .tpl.php 的编译缓存目录 |
 | `getCompiler(): TemplateCompiler` | 获取编译器实例 |
 
 ## 设计哲学
@@ -429,7 +429,7 @@ PHP 本身就是模板引擎。miGears Template 只提供每个模板引擎都�
 2. **复用** — 布局继承和组件减少重复
 3. **简洁** — 你已经懂语法了
 
-**`{{ }}` 语法糖是可选的** — 它编译为纯 PHP，你随时可以看到实际运行的代码。用 `.tpl.php` 获得更简洁的输出语法，或用 `.php` 写原生 PHP。两种方式无缝共存。
+**`## ##` 语法糖是可选的** — 它编译为纯 PHP，你随时可以看到实际运行的代码。用 `.tpl.php` 获得更简洁的输出语法，或用 `.php` 写原生 PHP。两种方式无缝共存。
 
 **我们不做的事**：
 - 没有模板级 DSL（没有 `{% if %}`、`{% foreach %}` — 用原生 PHP 标签）

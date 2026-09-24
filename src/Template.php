@@ -237,13 +237,9 @@ class Template
             while (ob_get_level() > $level) {
                 ob_end_clean();
             }
-            // Clear any dangling section buffers
-            while ($this->sectionStack !== []) {
-                array_pop($this->sectionStack);
-                if (ob_get_level() > $level) {
-                    ob_end_clean();
-                }
-            }
+            // The buffers are gone by now, so only the stack is left: whatever it
+            // still holds must not reach the next render.
+            $this->sectionStack = [];
             throw $e;
         }
 

@@ -250,6 +250,71 @@ class TemplateCompilerTest extends TestCase
         rmdir($cacheDir);
     }
 
+    public function testCompileToCacheReportsADirectoryItCannotCreate(): void
+    {
+        // A file where the cache directory has to go: mkdir() cannot succeed, and
+        // the failure has to be named here rather than surfacing as a missing
+        // include from the renderer further down.
+        $source = tempnam(sys_get_temp_dir(), 'tpl_src_') . '.tpl.php';
+        file_put_contents($source, '## $name ##');
+        $blocker = sys_get_temp_dir() . '/migears_test_blocker_' . uniqid();
+        file_put_contents($blocker, 'not a directory');
+
+        try {
+            $this->compiler->compileToCache($source, $blocker . '/cache');
+            $this->fail('should have reported the cache directory it cannot create');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Cannot create cache directory', $e->getMessage());
+        } finally {
+            unlink($source);
+            unlink($blocker);
+        }
+    }
+
+    public function testCompileToCacheReportsAFileItCannotWrite(): void
+    {
+        $source = tempnam(sys_get_temp_dir(), 'tpl_src_') . '.tpl.php';
+        file_put_contents($source, '## $name ##');
+        $cacheDir = sys_get_temp_dir() . '/migears_test_cache_' . uniqid();
+        mkdir($cacheDir, 0500, true);
+        if (is_writable($cacheDir)) {
+            $this->markTestSkipped('this user writes into directories regardless of their mode');
+        }
+
+        try {
+            $this->compiler->compileToCache($source, $cacheDir);
+            $this->fail('should have reported the cache file it cannot write');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Failed to write cache file', $e->getMessage());
+        } finally {
+            chmod($cacheDir, 0700);
+            unlink($source);
+            rmdir($cacheDir);
+        }
+    }
+
+    public function testCompileFileReportsAFileItCannotRead(): void
+    {
+        // A file that exists and cannot be read: the CLI case covers this through
+        // a child process, which leaves the compiler's own branch unexercised here.
+        $file = tempnam(sys_get_temp_dir(), 'tpl_src_') . '.tpl.php';
+        file_put_contents($file, '## $name ##');
+        chmod($file, 0000);
+        if (is_readable($file)) {
+            $this->markTestSkipped('this user reads files regardless of their mode');
+        }
+
+        try {
+            $this->compiler->compileFile($file);
+            $this->fail('should have reported the template it cannot read');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Failed to read template', $e->getMessage());
+        } finally {
+            chmod($file, 0644);
+            unlink($file);
+        }
+    }
+
     public function testIsStaleNoCache(): void
     {
         $this->assertTrue($this->compiler->isStale('/any/source', '/nonexistent/cache'));

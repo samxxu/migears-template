@@ -114,6 +114,26 @@ class TemplateTest extends TestCase
         $this->assertStringContainsString('<title>Default Title</title>', $html);
     }
 
+    // --- Cache directory ---
+
+    public function testSetCacheDirPlacesTheCompiledTemplateThere(): void
+    {
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/plain.tpl.php', 'Hello ## $name ##');
+
+        $cacheDir = $dir . '/cache';
+        $html = (new Template($dir))->setCacheDir($cacheDir)->render('plain', ['name' => 'Alice']);
+
+        $this->assertSame('Hello Alice', $html);
+        $this->assertCount(1, glob($cacheDir . '/*.php') ?: []);
+
+        array_map('unlink', glob($cacheDir . '/*.php') ?: []);
+        rmdir($cacheDir);
+        unlink($dir . '/plain.tpl.php');
+        rmdir($dir);
+    }
+
     // --- Components ---
 
     public function testComponent(): void
@@ -182,6 +202,55 @@ class TemplateTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Component not found');
         $this->tpl->component('nonexistent');
+    }
+
+    public function testMissingLayoutIsNamedAsALayout(): void
+    {
+        // A child template whose layout resolves to nothing is a different failure
+        // from the child template itself being missing, and only this one says so.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/orphan.php', '<?php $this->extends("layout/missing") ?>body');
+
+        try {
+            (new Template($dir))->render('orphan');
+            $this->fail('should have reported the layout it cannot find');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Layout template not found', $e->getMessage());
+        } finally {
+            unlink($dir . '/orphan.php');
+            rmdir($dir);
+        }
+    }
+
+    public function testAFailingTemplateLeavesNoBuffersOrSectionsOpen(): void
+    {
+        // start() opens a buffer and remembers the section; the template then
+        // fails. Both have to be unwound, or the next render inherits them.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents(
+            $dir . '/boom.php',
+            '<?php $this->start("content") ?>captured<?php throw new \RuntimeException("boom") ?>'
+        );
+
+        $level = ob_get_level();
+        try {
+            (new Template($dir))->render('boom');
+            $this->fail('should have propagated the template failure');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('boom', $e->getMessage());
+        } finally {
+            unlink($dir . '/boom.php');
+            rmdir($dir);
+        }
+
+        $this->assertSame($level, ob_get_level());
+
+        // The text the failing template had captured must not reach another render.
+        $html = $this->tpl->render('layout/main');
+        $this->assertStringContainsString('<title>Default Title</title>', $html);
+        $this->assertStringNotContainsString('captured', $html);
     }
 
     public function testExistsReturnsTrueForExistingTemplate(): void

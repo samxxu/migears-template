@@ -170,6 +170,52 @@ final class CliTest extends TestCase
         $this->assertStringNotContainsString('Stack trace', $output);
     }
 
+    public function testBatchKeepsGoingWhenOneTemplateCannotBeRead(): void
+    {
+        $dir = $this->tempDir();
+        mkdir($dir . '/views', 0755, true);
+        file_put_contents($dir . '/views/a.tpl.php', 'A');
+        file_put_contents($dir . '/views/b.tpl.php', 'B');
+        file_put_contents($dir . '/views/broken.tpl.php', 'C');
+        chmod($dir . '/views/broken.tpl.php', 0000);
+        if (is_readable($dir . '/views/broken.tpl.php')) {
+            $this->markTestSkipped('this user reads files regardless of their mode');
+        }
+
+        [$output, $code] = $this->runCli([$dir . '/views', $dir . '/cache']);
+
+        // The unreadable template used to end the run through the top-level
+        // handler: neither a nor b was compiled and nothing was said about them.
+        $this->assertSame(1, $code);
+        $this->assertStringContainsString('broken.tpl.php', $output);
+        $this->assertCount(1, glob($dir . '/cache/a_*.php'));
+        $this->assertCount(1, glob($dir . '/cache/b_*.php'));
+        $this->assertStringContainsString('Done. 2 file(s) compiled.', $output);
+
+        chmod($dir . '/views/broken.tpl.php', 0644);
+    }
+
+    public function testUnreadableTemplateDoesNotLeakTheNativeWarning(): void
+    {
+        $dir = $this->tempDir();
+        $source = $dir . '/broken.tpl.php';
+        file_put_contents($source, 'C');
+        chmod($source, 0000);
+        if (is_readable($source)) {
+            $this->markTestSkipped('this user reads files regardless of their mode');
+        }
+
+        [$output, $code] = $this->runCli([$source]);
+
+        $this->assertSame(1, $code);
+        $this->assertStringContainsString('Failed to read template', $output);
+        // file_get_contents() printed its own "Failed to open stream" diagnostic
+        // first, so one failure was reported twice.
+        $this->assertStringNotContainsString('Warning', $output);
+
+        chmod($source, 0644);
+    }
+
     /**
      * @param list<string> $args
      * @param list<string> $ini

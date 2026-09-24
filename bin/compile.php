@@ -100,19 +100,35 @@ $run = static function () use ($source, $target): int {
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS)
         );
-
-        $count = 0;
+        $files = [];
         foreach ($iterator as $file) {
             if ($file->isFile() && str_ends_with($file->getFilename(), '.tpl.php')) {
-                $cachePath = $compiler->compileToCache($file->getPathname(), $target);
-                echo "Compiled: {$file->getPathname()} → {$cachePath}\n";
+                $files[] = $file->getPathname();
+            }
+        }
+        // Sorted so the report is stable: the iterator hands out whatever order
+        // the filesystem happens to keep, which differs between checkouts.
+        sort($files);
+
+        $count = 0;
+        $failed = false;
+        foreach ($files as $file) {
+            try {
+                $cachePath = $compiler->compileToCache($file, $target);
+                echo "Compiled: {$file} → {$cachePath}\n";
                 $count++;
+            } catch (RuntimeException $e) {
+                // A template the author has to fix. It used to end the run
+                // through the top-level handler, so everything after it went
+                // uncompiled and nothing was said about those files.
+                $failed = true;
+                fwrite(STDERR, $file . ': ' . $e->getMessage() . "\n");
             }
         }
 
         echo "\nDone. {$count} file(s) compiled.\n";
 
-        return 0;
+        return $failed ? 1 : 0;
     }
 
     if (! is_file($source)) {
@@ -121,7 +137,13 @@ $run = static function () use ($source, $target): int {
         return 1;
     }
 
-    $compiled = $compiler->compileFile($source);
+    try {
+        $compiled = $compiler->compileFile($source);
+    } catch (RuntimeException $e) {
+        fwrite(STDERR, $source . ': ' . $e->getMessage() . "\n");
+
+        return 1;
+    }
 
     if ($target === null) {
         echo "--- Compiled PHP ---\n";
@@ -154,8 +176,8 @@ $run = static function () use ($source, $target): int {
 try {
     exit($run());
 } catch (Throwable $e) {
-    // Last resort: the compiler reports an unusable template or cache directory
-    // by throwing, and a caller reading only the exit code still has to be able
+    // Last resort, for an unexpected Error or a failure outside the per-file
+    // handlers above: a caller reading only the exit code still has to be able
     // to tell a failure (1) from a crash of its own.
     fwrite(STDERR, 'fatal: ' . $e->getMessage() . "\n");
     exit(1);

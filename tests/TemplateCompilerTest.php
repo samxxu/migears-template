@@ -283,6 +283,21 @@ class TemplateCompilerTest extends TestCase
         unlink($cache);
     }
 
+    public function testIsStaleWhenSourceIsGoneButCacheRemains(): void
+    {
+        $cache = tempnam(sys_get_temp_dir(), 'tpl_cache_');
+        touch($cache, time());
+
+        // A source deleted between the listing and the compile used to read as
+        // "already compiled": filemtime() warned, returned false, and false
+        // never beats the cache's timestamp, so the run exited 0 having written
+        // nothing. Stale means the compile is attempted, which is where the
+        // missing file is named.
+        $this->assertTrue($this->compiler->isStale('/nonexistent/source.tpl.php', $cache));
+
+        unlink($cache);
+    }
+
     public function testGetCachePath(): void
     {
         $path = $this->compiler->getCachePath('/views/home.tpl.php', '/cache');

@@ -77,7 +77,10 @@ class TemplateCompiler
             throw new \RuntimeException("Template file not found: {$path}");
         }
 
-        $source = file_get_contents($path);
+        // "@" keeps the native "Failed to open stream" diagnostic out of the
+        // caller's output: the exception below is the report, and printing both
+        // says the same thing twice.
+        $source = @file_get_contents($path);
         if ($source === false) {
             throw new \RuntimeException("Failed to read template: {$path}");
         }
@@ -90,11 +93,18 @@ class TemplateCompiler
      */
     public function isStale(string $sourcePath, string $cachePath): bool
     {
-        if (! is_file($cachePath)) {
+        // An unreadable mtime means stale, not fresh. The source used to be read
+        // with a bare filemtime(): a file deleted between the listing and the
+        // compile warned, returned false, and false never beats the cache's
+        // timestamp, so the run reported "already compiled" and exited 0. Stale
+        // attempts the compile, which is where a missing file is named.
+        $sourceTime = @filemtime($sourcePath);
+        $cacheTime = @filemtime($cachePath);
+        if ($sourceTime === false || $cacheTime === false) {
             return true;
         }
 
-        return filemtime($sourcePath) > filemtime($cachePath);
+        return $sourceTime > $cacheTime;
     }
 
     /**
@@ -121,11 +131,11 @@ class TemplateCompiler
 
         $compiled = $this->compileFile($sourcePath);
 
-        if (! is_dir($cacheDir) && ! mkdir($cacheDir, 0755, true)) {
+        if (! is_dir($cacheDir) && ! @mkdir($cacheDir, 0755, true)) {
             throw new \RuntimeException("Cannot create cache directory: {$cacheDir}");
         }
 
-        $written = file_put_contents($cachePath, $compiled, LOCK_EX);
+        $written = @file_put_contents($cachePath, $compiled, LOCK_EX);
         if ($written === false) {
             throw new \RuntimeException("Failed to write cache file: {$cachePath}");
         }

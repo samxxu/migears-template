@@ -187,6 +187,9 @@ class Template
     /**
      * Render a component template and return its output.
      *
+     * A component is self-contained: it neither reads sections captured by an
+     * outer render nor leaves its own layout/section state behind.
+     *
      * @param string $name Component template path
      * @param array<string, mixed> $data Component data
      */
@@ -196,7 +199,21 @@ class Template
         if ($file === null) {
             throw new \RuntimeException("Component not found: {$name}");
         }
-        return $this->evaluate($file, $data);
+
+        $layout = $this->layout;
+        $sections = $this->sections;
+        $stack = $this->sectionStack;
+        $this->layout = null;
+        $this->sections = [];
+        $this->sectionStack = [];
+
+        try {
+            return $this->evaluate($file, $data);
+        } finally {
+            $this->layout = $layout;
+            $this->sections = $sections;
+            $this->sectionStack = $stack;
+        }
     }
 
     /**
@@ -243,7 +260,14 @@ class Template
             throw $e;
         }
 
-        return ob_get_clean();
+        // Close every buffer the template opened above the entry level: the
+        // innermost one holds all of its output, and an unpaired start() must
+        // not leave one behind for the next render.
+        $content = ob_get_clean();
+        while (ob_get_level() > $level) {
+            ob_end_clean();
+        }
+        return $content;
     }
 
     /**

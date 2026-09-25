@@ -253,6 +253,77 @@ class TemplateTest extends TestCase
         $this->assertStringNotContainsString('captured', $html);
     }
 
+    // --- Buffer hygiene and component state isolation ---
+
+    public function testUnpairedStartLeavesNoBufferBehind(): void
+    {
+        // start() without end() used to leave the evaluate buffer open, so every
+        // render raised the global buffer level by one. The stray buffer must be
+        // closed with whatever output it held, and nothing may leak forward.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/open.tpl.php', '<?php $this->start("x") ?>captured');
+        file_put_contents($dir . '/clean.tpl.php', 'clean');
+
+        $level = ob_get_level();
+        $tpl = new Template($dir);
+
+        $this->assertStringContainsString('captured', $tpl->render('open'));
+        $this->assertSame($level, ob_get_level());
+        $this->assertSame('clean', $tpl->render('clean'));
+
+        unlink($dir . '/open.tpl.php');
+        unlink($dir . '/clean.tpl.php');
+        rmdir($dir);
+    }
+
+    public function testComponentDoesNotLeakSections(): void
+    {
+        // A component must not read sections captured by a previous render.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/a.tpl.php', '<?php $this->start("t") ?>AAA<?php $this->end() ?>');
+        file_put_contents($dir . '/c.tpl.php', '<?= $this->section("t", "DEFAULT") ?>');
+
+        $tpl = new Template($dir);
+        $tpl->render('a'); // captures section t = AAA
+
+        $this->assertSame('DEFAULT', $tpl->component('c'));
+
+        unlink($dir . '/a.tpl.php');
+        unlink($dir . '/c.tpl.php');
+        rmdir($dir);
+    }
+
+    public function testComponentInsideRenderKeepsLayoutIntact(): void
+    {
+        // A component rendered inside a start/end pair must not swallow the
+        // section being captured around it, nor the layout set by the child.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents(
+            $dir . '/layout.php',
+            '<title><?= $this->section("title", "Default") ?></title>[<?= $this->section("body", "no body") ?>]'
+        );
+        file_put_contents(
+            $dir . '/child.php',
+            '<?php $this->extends("layout") ?>'
+            . '<?php $this->start("title") ?>T<?php $this->end() ?>'
+            . '<?php $this->start("body") ?><?= $this->component("comp") ?>B<?php $this->end() ?>'
+        );
+        file_put_contents($dir . '/comp.tpl.php', 'COMP');
+
+        $html = (new Template($dir))->render('child');
+
+        $this->assertStringContainsString('<title>T</title>', $html);
+        $this->assertStringContainsString('[COMPB]', $html);
+
+        unlink($dir . '/layout.php');
+        unlink($dir . '/child.php');
+        unlink($dir . '/comp.tpl.php');
+        rmdir($dir);
+    }
+
     public function testTemplateNamesCannotClimbOutOfTheRegisteredPaths(): void
     {
         // A name is joined with the registered roots, so ".." used to reach a file

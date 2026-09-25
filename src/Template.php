@@ -263,6 +263,21 @@ class Template
      */
     private function findTemplate(string $template): ?string
     {
+        // A name resolves inside the registered roots and nowhere else: ".." climbs
+        // out of them, an empty or "." segment names the root itself, and a
+        // backslash is a separator on Windows, where it would climb out too. A NUL
+        // byte never reaches the filesystem call that would refuse it. Raw names
+        // are not escaped here — the compiler refuses them with the page path in
+        // its message — this is what a name arriving directly has to pass.
+        if (str_contains($template, "\0")) {
+            return null;
+        }
+        foreach (preg_split('#[/\\\\]#', $template) ?: [] as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                return null;
+            }
+        }
+
         // Try .tpl.php first (new syntax), then .php (native PHP)
         foreach (['.tpl.php', '.php'] as $ext) {
             $file = $template . $ext;

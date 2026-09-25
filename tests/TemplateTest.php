@@ -253,6 +253,32 @@ class TemplateTest extends TestCase
         $this->assertStringNotContainsString('captured', $html);
     }
 
+    public function testTemplateNamesCannotClimbOutOfTheRegisteredPaths(): void
+    {
+        // A name is joined with the registered roots, so ".." used to reach a file
+        // beside them and include it.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir . '/views', 0755, true);
+        file_put_contents($dir . '/outside.tpl.php', 'escaped');
+
+        $tpl = new Template($dir . '/views');
+        try {
+            foreach (['render' => 'Template not found', 'component' => 'Component not found'] as $method => $expected) {
+                try {
+                    $tpl->{$method}('../outside');
+                    $this->fail("{$method}() should not reach a template outside the registered paths");
+                } catch (\RuntimeException $e) {
+                    $this->assertStringContainsString($expected, $e->getMessage());
+                    $this->assertStringContainsString('../outside', $e->getMessage());
+                }
+            }
+        } finally {
+            unlink($dir . '/outside.tpl.php');
+            rmdir($dir . '/views');
+            rmdir($dir);
+        }
+    }
+
     public function testExistsReturnsTrueForExistingTemplate(): void
     {
         $this->assertTrue($this->tpl->exists('hello'));

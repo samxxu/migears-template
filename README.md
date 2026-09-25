@@ -180,7 +180,7 @@ $tpl = new Template(__DIR__ . '/views');
 $tpl->addPath(__DIR__ . '/themes/dark');  // checked first
 ```
 
-Templates are searched in reverse order of `addPath()` calls. First match wins.
+Templates are searched in reverse order of `addPath()` calls. First match wins. A name resolves inside those roots and nowhere else: `..`, `.` and empty path segments (and a NUL byte) are refused rather than looked up, so a name never reaches a file beside them.
 
 ## API Reference
 
@@ -416,7 +416,7 @@ $tpl = new Template(__DIR__ . '/views');
 $tpl->addPath(__DIR__ . '/themes/dark');  // 优先查找
 ```
 
-模板按 `addPath()` 调用的逆序查找，先找到的优先使用。
+模板按 `addPath()` 调用的逆序查找，先找到的优先使用。名字只在这些根内解析，不会到根外去找：`..`、`.`、空路径段（以及 NUL 字节）一律拒绝，名字因此触达不到根旁的文件。
 
 ## API 参考
 

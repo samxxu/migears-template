@@ -75,14 +75,14 @@ Use `.tpl.php` extension for the `## ##` syntax — auto-compiled to pure PHP at
 |--------|-------------|-------------|
 | `## $expr ##` | `<?= $this->e($expr) ?>` | Escaped output (auto HTML-escaping) |
 | `### $expr ###` | `<?= $this->raw($expr) ?>` | Raw output (no escaping, for trusted HTML) |
-| `## section('name') ##` | `<?= $this->section('name') ?>` | Output a section |
+| `## section('name') ##` | `<?= $this->section('name') ?>` | Output a section — **not** escaped: a section holds markup a template already wrote, so escaping it here would escape it twice |
 | `\## … \##` | literal `##` | Escaped hashes — a backslash before a run of two or more hashes keeps it literal |
 
 Control structures (`if`, `foreach`, `for`, `while`) use **native PHP tags** — this preserves IDE syntax highlighting, auto-completion, and error checking.
 
 **How it works:**
 1. `.tpl.php` files are compiled to pure PHP cache files on first render
-2. Cache is regenerated only when the source file changes (mtime check)
+2. Cache is regenerated only when the source file changes (mtime check, at second granularity — a source edited within the same second as the cache file is not counted as newer)
 3. `.php` files run directly — zero compilation overhead
 4. Both can coexist in the same project
 
@@ -188,8 +188,8 @@ Templates are searched in reverse order of `addPath()` calls. First match wins. 
 |--------|-------------|
 | `render(string $template, array $data = []): string` | Render a template (.php or .tpl.php) |
 | `exists(string $template): bool` | Check if template exists |
-| `e(mixed $value): string` | Escape for HTML output |
-| `raw(string $html): string` | Output raw HTML (trust required) |
+| `e(mixed $value, string $encoding = 'UTF-8'): string` | Escape for HTML output. Arrays and objects are JSON-encoded first; `$encoding` is passed to `htmlspecialchars()` |
+| `raw(mixed $value): string` | Output without escaping (trust required). Takes what `e()` takes, so `### $expr ###` and `## $expr ##` differ only in the escaping |
 | `extends(string $layout): void` | Set layout template |
 | `start(string $name): void` | Start capturing a section |
 | `end(): void` | End current section |
@@ -311,14 +311,14 @@ echo $tpl->render('user/profile', [
 |------|---------|------|
 | `## $expr ##` | `<?= $this->e($expr) ?>` | 转义输出（自动 HTML 转义） |
 | `### $expr ###` | `<?= $this->raw($expr) ?>` | 原始输出（不转义，用于信任的 HTML） |
-| `## section('name') ##` | `<?= $this->section('name') ?>` | 输出区块 |
+| `## section('name') ##` | `<?= $this->section('name') ?>` | 输出区块——**不转义**：区块装的是模板已经写出的标记，在这里转义等于转义两次 |
 | `\## … \##` | 字面 `##` | 转义井号——反斜杠加两个及以上井号，保持字面 |
 
 控制结构（`if`、`foreach`、`for`、`while`）使用**原生 PHP 标签** — 保留 IDE 语法高亮、自动补全和错误检查。
 
 **工作原理：**
 1. `.tpl.php` 文件首次渲染时编译为纯 PHP 缓存文件
-2. 源文件修改后才重新编译（mtime 检查）
+2. 源文件修改后才重新编译（mtime 检查，粒度为秒——与缓存文件同一秒内改动的源文件不会被判定为更新）
 3. `.php` 文件直接运行 — 零编译开销
 4. 两种文件可以在同一项目中共存
 
@@ -424,8 +424,8 @@ $tpl->addPath(__DIR__ . '/themes/dark');  // 优先查找
 |------|------|
 | `render(string $template, array $data = []): string` | 渲染模板（.php 或 .tpl.php） |
 | `exists(string $template): bool` | 检查模板是否存在 |
-| `e(mixed $value): string` | HTML 转义输出 |
-| `raw(string $html): string` | 原始 HTML 输出（需信任内容） |
+| `e(mixed $value, string $encoding = 'UTF-8'): string` | HTML 转义输出。数组与对象先 JSON 编码；`$encoding` 传给 `htmlspecialchars()` |
+| `raw(mixed $value): string` | 不转义输出（需信任内容）。参数与 `e()` 一致，因此 `### $expr ###` 与 `## $expr ##` 只差转义 |
 | `extends(string $layout): void` | 设置布局模板 |
 | `start(string $name): void` | 开始捕获区块 |
 | `end(): void` | 结束当前区块 |

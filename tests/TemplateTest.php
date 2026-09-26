@@ -81,6 +81,53 @@ class TemplateTest extends TestCase
         $this->assertSame('<b>bold</b>', $html);
     }
 
+    public function testRawAcceptsWhatEAccepts(): void
+    {
+        // `### $expr ###` and `## $expr ##` are one construct apart from the
+        // escaping, so the two methods take the same values. raw() declared a
+        // string parameter, and an array reaching it was a TypeError from the
+        // signature rather than anything about the template.
+        $tpl = new Template($this->fixtures);
+
+        $this->assertSame('{"a":"<b>"}', $tpl->raw(['a' => '<b>']));
+        $this->assertSame('', $tpl->raw(null));
+        $this->assertSame('42', $tpl->raw(42));
+    }
+
+    public function testEKeepsAValueWhoseUtf8IsBroken(): void
+    {
+        // One bad byte used to make json_encode() answer false, and that false
+        // reached htmlspecialchars() where a string was due. The value is now kept,
+        // with the bad byte replaced, so nothing about it is lost.
+        $tpl = new Template($this->fixtures);
+        $result = $tpl->e(['bad' => "\xB1\x31"]);
+
+        $this->assertStringContainsString('&quot;bad&quot;', $result);
+        $this->assertStringContainsString("\u{FFFD}", $result);
+    }
+
+    public function testEAndRawNameTheValueNoFlagCanEncode(): void
+    {
+        // NAN has no JSON representation, so json_encode() answers false whatever
+        // flags are set. Both methods name the failure instead of passing the false
+        // on to a caller that asked for a string.
+        $tpl = new Template($this->fixtures);
+
+        try {
+            $tpl->e(['x' => NAN]);
+            $this->fail('e() should have refused a value it cannot encode');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('as JSON', $e->getMessage());
+        }
+
+        try {
+            $tpl->raw(['x' => NAN]);
+            $this->fail('raw() should have refused a value it cannot encode');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('as JSON', $e->getMessage());
+        }
+    }
+
     // --- Layout inheritance ---
 
     public function testLayoutExtendsAndSection(): void
@@ -390,6 +437,22 @@ class TemplateTest extends TestCase
         $this->expectExceptionMessage('end() called without a matching start()');
 
         $tpl = new Template($this->fixtures);
+        $tpl->end();
+    }
+
+    public function testEndNamesABufferThatIsAlreadyClosed(): void
+    {
+        // start() opens a buffer and end() closes it. A template is free to close it
+        // itself in between, and then the buffer on top belongs to someone else:
+        // ob_get_clean() used to clean that one — the caller's, PHPUnit's in a test —
+        // and store it as this section's content from a property declared string.
+        $tpl = new Template($this->fixtures);
+        $tpl->start('content');
+        ob_end_clean();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('the buffer start() opened is gone');
+
         $tpl->end();
     }
 

@@ -43,7 +43,13 @@ class Template
     /** @var array<string, string> Captured section contents */
     private array $sections = [];
 
-    /** @var list<string> Stack of section names currently being captured */
+    /**
+     * Stack of the sections currently being captured: the name, and the level of
+     * the output buffer start() opened. The level is what lets end() tell whether
+     * the buffer it is about to clean is still its own.
+     *
+     * @var list<array{name: string, level: int}>
+     */
     private array $sectionStack = [];
 
     /** @var TemplateCompiler|null Lazy-init compiler for ## ## syntax */
@@ -131,7 +137,7 @@ class Template
             return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, $encoding);
         }
         return htmlspecialchars(
-            json_encode($value, JSON_UNESCAPED_UNICODE),
+            self::json($value),
             ENT_QUOTES | ENT_SUBSTITUTE,
             $encoding
         );
@@ -140,10 +146,42 @@ class Template
     /**
      * Output raw HTML without escaping.
      * Use only with trusted content.
+     *
+     * Accepts what e() accepts, so `### $expr ###` and `## $expr ##` differ only
+     * in the escaping: an array reaching raw() used to be a TypeError from the
+     * string parameter, which is the same value one construct over.
      */
-    public function raw(string $html): string
+    public function raw(mixed $value): string
     {
-        return $html;
+        if ($value === null) {
+            return '';
+        }
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+        return self::json($value);
+    }
+
+    /**
+     * The JSON text for a value neither branch of the two methods above can
+     * render on its own.
+     *
+     * JSON_INVALID_UTF8_SUBSTITUTE keeps one bad byte from emptying the whole
+     * value, which is how json_encode() otherwise reports it — a false that then
+     * reached htmlspecialchars() as a bool where a string was due. Some values no
+     * flag can encode at all (NAN, INF, a recursion), and json_encode() answers
+     * false for those too, so the failure is named here rather than passed on.
+     */
+    private static function json(mixed $value): string
+    {
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            throw new \RuntimeException(
+                'cannot render a ' . get_debug_type($value) . ' as JSON: ' . json_last_error_msg()
+            );
+        }
+
+        return $json;
     }
 
     /**
@@ -161,8 +199,8 @@ class Template
      */
     public function start(string $name): void
     {
-        $this->sectionStack[] = $name;
         ob_start();
+        $this->sectionStack[] = ['name' => $name, 'level' => ob_get_level()];
     }
 
     /**
@@ -173,8 +211,23 @@ class Template
         if ($this->sectionStack === []) {
             throw new \RuntimeException('end() called without a matching start()');
         }
-        $name = array_pop($this->sectionStack);
-        $this->sections[$name] = ob_get_clean();
+        ['name' => $name, 'level' => $level] = array_pop($this->sectionStack);
+
+        // The buffer start() opened may be gone: a template is free to call
+        // ob_end_clean() itself. Cleaning whatever sits on top instead would take
+        // the caller's own buffer — PHPUnit's, in a test — as this section's
+        // content, so the level is checked before anything is read. Storing the
+        // false that ob_get_clean() then answers made section() return a bool from
+        // a method declared string, and the section was simply gone.
+        if (ob_get_level() !== $level) {
+            throw new \RuntimeException(
+                "section \"{$name}\": the buffer start() opened is gone; something ended it before end()"
+            );
+        }
+
+        // The level check just proved a buffer is there, so ob_get_clean() cannot
+        // answer false here; the cast covers its declared string|false return.
+        $this->sections[$name] = (string) ob_get_clean();
     }
 
     /**

@@ -26,13 +26,24 @@ class TemplateCompiler
         // A backslash before a run of two or more hashes escapes it: \## is a literal
         // ##, \### a literal ###. Mask those runs first — the passes below are text-level
         // and would otherwise read them as output expressions.
+        //
+        // The mask is one NUL longer than the longest run of NULs already in the
+        // source, so the source cannot contain the marker itself: a fixed
+        // "\x00<index>\x00" collided with a template that carried that byte
+        // sequence, and the restore below then rewrote whatever followed it as if
+        // it were an escaped hash run.
+        $marker = "\x00";
+        while (str_contains($source, $marker)) {
+            $marker .= "\x00";
+        }
+
         $literals = [];
         $source = preg_replace_callback(
             '/\\\\(#{2,})/s',
-            function (array $m) use (&$literals): string {
+            function (array $m) use (&$literals, $marker): string {
                 $literals[] = $m[1];
 
-                return "\x00" . (count($literals) - 1) . "\x00";
+                return $marker . (count($literals) - 1) . $marker;
             },
             $source
         );
@@ -52,9 +63,12 @@ class TemplateCompiler
             '/##\s*(.+?)\s*##/s',
             function (array $m): string {
                 $expr = $m[1];
-                // ## section('name') ## → section('name')
+                // ## section('name') ## → section('name'). The name is author text,
+                // so it is written out as a PHP literal the way the parser would
+                // read it: splicing it between two quote characters let a name like
+                // a') . system('id') . ('b close the string and run as code.
                 if (preg_match('/^section\(\s*["\'](.+?)["\']\s*\)$/i', $expr, $secMatch)) {
-                    return "<?= \$this->section('{$secMatch[1]}') ?>";
+                    return '<?= $this->section(' . var_export($secMatch[1], true) . ') ?>';
                 }
                 return "<?= \$this->e({$expr}) ?>";
             },
@@ -62,7 +76,7 @@ class TemplateCompiler
         );
 
         foreach ($literals as $index => $hashes) {
-            $source = str_replace("\x00{$index}\x00", $hashes, $source);
+            $source = str_replace($marker . $index . $marker, $hashes, $source);
         }
 
         return $source;

@@ -51,6 +51,20 @@ class TemplateCompilerTest extends TestCase
         $this->assertSame('\##', $this->compiler->compile('\\\\##'));
     }
 
+    public function testAMaskMarkerInTheSourceIsNotMistakenForAnEscapedRun(): void
+    {
+        // The mask that hides \## runs is made of NUL bytes, and the source is free
+        // to contain that byte sequence itself. A fixed "\x00<index>\x00" placeholder
+        // matched it: the restore pass read the template's own bytes as the first
+        // escaped run and put ## where they had been.
+        $source = "## \$name ##\n\x000\x00\n\\## x \\##";
+
+        $this->assertSame(
+            "<?= \$this->e(\$name) ?>\n\x000\x00\n## x ##",
+            $this->compiler->compile($source)
+        );
+    }
+
     // --- ## ## escaped output ---
 
     public function testVariableOutput(): void
@@ -130,6 +144,26 @@ class TemplateCompilerTest extends TestCase
     {
         $result = $this->compiler->compile("## section('sidebar') ##");
         $this->assertSame("<?= \$this->section('sidebar') ?>", $result);
+    }
+
+    public function testSectionNameCannotCloseTheStringItIsWrittenInto(): void
+    {
+        // The name is author text, and it used to be spliced between two quote
+        // characters: a name that carried a quote ended the literal and let the rest
+        // run as code. It is written out as a PHP literal now, so the whole name
+        // reaches section() and nothing in it executes.
+        $name = "a') . system('id') . ('b";
+        $compiled = $this->compiler->compile('## section("' . $name . '") ##');
+
+        $this->assertSame("<?= \$this->section('a\\') . system(\\'id\\') . (\\'b') ?>", $compiled);
+
+        $file = tempnam(sys_get_temp_dir(), 'tpl');
+        self::assertNotFalse($file);
+        file_put_contents($file, $compiled);
+        exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file) . ' 2>&1', $output, $code);
+        unlink($file);
+
+        $this->assertSame(0, $code, 'the compiled artefact is not parseable PHP: ' . implode(' ', $output));
     }
 
     // --- Native PHP preserved ---

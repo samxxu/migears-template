@@ -103,10 +103,12 @@ class Template
         $content = $this->evaluate($file, $data);
 
         // If a layout was set, render the layout with captured sections
-        if ($this->layout !== null) {
-            $layoutFile = $this->findTemplate($this->layout);
+        /** @var string|null $layout Set by the template via extends(), which evaluate() includes at runtime. */
+        $layout = $this->layout;
+        if ($layout !== null) {
+            $layoutFile = $this->findTemplate($layout);
             if ($layoutFile === null) {
-                throw new \RuntimeException("Layout template not found: {$this->layout}");
+                throw new \RuntimeException("Layout template not found: {$layout}");
             }
             // The layout uses section() to output sections
             $content = $this->evaluate($layoutFile, $data);
@@ -236,6 +238,8 @@ class Template
     /**
      * Evaluate a PHP template file with isolated scope.
      * .tpl.php files are compiled to PHP first; .php files run directly.
+     *
+     * @param array<string, mixed> $__data__ Variables extracted into the template scope
      */
     private function evaluate(string $__file__, array $__data__): string
     {

@@ -128,6 +128,31 @@ class TemplateTest extends TestCase
         }
     }
 
+    public function testEAndRawNameABareNonFiniteFloat(): void
+    {
+        // A non-finite float is a scalar, so it took the cast rather than reaching
+        // json(): NAN warned "unexpected NAN value was coerced to string", and INF
+        // and -INF became "INF" and "-INF" without a word. JSON refuses all three,
+        // so all three are named the way an array holding one already was.
+        $tpl = new Template($this->fixtures);
+
+        foreach ([NAN, INF, -INF] as $value) {
+            try {
+                $tpl->e($value);
+                $this->fail('e() should have refused ' . var_export($value, true));
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('as JSON', $e->getMessage());
+            }
+
+            try {
+                $tpl->raw($value);
+                $this->fail('raw() should have refused ' . var_export($value, true));
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('as JSON', $e->getMessage());
+            }
+        }
+    }
+
     // --- Layout inheritance ---
 
     public function testLayoutExtendsAndSection(): void

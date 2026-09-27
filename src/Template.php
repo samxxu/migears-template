@@ -134,7 +134,7 @@ class Template
             return '';
         }
         if (is_scalar($value)) {
-            return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, $encoding);
+            return htmlspecialchars(self::scalar($value), ENT_QUOTES | ENT_SUBSTITUTE, $encoding);
         }
         return htmlspecialchars(
             self::json($value),
@@ -157,14 +157,30 @@ class Template
             return '';
         }
         if (is_scalar($value)) {
-            return (string) $value;
+            return self::scalar($value);
         }
         return self::json($value);
     }
 
     /**
-     * The JSON text for a value neither branch of the two methods above can
-     * render on its own.
+     * The text of a scalar, with the floats JSON refuses named rather than cast.
+     *
+     * A non-finite float is a scalar, so it never reached json(): the cast warned
+     * "unexpected NAN value was coerced to string" for NAN, and turned INF and
+     * -INF into a quiet "INF" and "-INF". JSON has no representation for either,
+     * and json() is where that is said out loud.
+     */
+    private static function scalar(mixed $value): string
+    {
+        if (is_float($value) && ! is_finite($value)) {
+            self::json($value);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * The JSON text for a value the scalar path above cannot render on its own.
      *
      * JSON_INVALID_UTF8_SUBSTITUTE keeps one bad byte from emptying the whole
      * value, which is how json_encode() otherwise reports it — a false that then

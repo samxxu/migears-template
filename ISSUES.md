@@ -10,7 +10,7 @@
 | | |
 |---|---|
 | Status / 状态 | **All findings closed / 全部问题已关闭** |
-| Findings / 问题 | P0 0 · P1 0 · P2 0 · P3 0 — closed 6 · open 0 |
+| Findings / 问题 | P0 0 · P1 0 · P2 0 · P3 0 — the report's 6 closed · 0 open, plus P2-5 found and closed in the same pass / 报告的 6 条全部关闭 · 无遗留，另有同批发现并关闭的 P2-5 |
 | Size / 体量 | src 549 lines · 98 tests |
 
 Legend / 图例 — **P0** functional or security · **P1** documentation that fails when copied · **P2** robustness · **P3** metadata and docs. 
@@ -91,6 +91,6 @@ Closing them turned up one more, fixed in the same pass: a bare non-finite float
 ## Verification protocol / 验证方式
 
 - `./vendor/bin/phpunit` · `composer analyse` · `composer validate`
-- A PHP warning counts as a test failure here (`failOnWarning` / `failOnNotice` / `failOnDeprecation` / `failOnRisky`).
-- 请注意这些模块的 `phpunit.xml.dist` 会因警告、通知、弃用而失败，因此「无输出」也是验收条件之一。
-- At this refresh / 本次刷新时: 98 tests · 197 assertions green · PHPStan level 6 clean · `composer validate` valid (its `version`-field warning predates these changes) / 98 项测试 · 197 条断言全绿 · PHPStan level 6 无错 · `composer validate` 通过（其 `version` 字段警告早于本次改动）
+- A PHP warning counts as a test failure here: `phpunit.xml.dist` sets `failOnWarning`, `failOnNotice`, `failOnDeprecation`, `failOnRisky` and `beStrictAboutOutputDuringTests`. That was claimed before it was configured — the flags were added on 2026-09-27, and until then a warning printed "OK, but there were issues!" and left the exit code at 0, which is how the P2-5 warning stayed invisible to the suite. `failOnSkipped` is deliberately absent: four tests skip when the suite runs as root, where the file-mode checks they exercise do not apply.
+- 本模块的 `phpunit.xml.dist` 已开启 `failOnWarning`、`failOnNotice`、`failOnDeprecation`、`failOnRisky` 与 `beStrictAboutOutputDuringTests`，因此 PHP 警告即测试失败。这一条曾先于配置存在——开关于 2026-09-27 才补上，此前警告只打印「OK, but there were issues!」并把退出码留在 0，P2-5 的警告正是这样逃过了套件。`failOnSkipped` 故意不设：有四个测试在以 root 运行时会跳过，它们检查的文件模式在该身份下不适用。
+- At this refresh / 本次刷新时: 98 tests · 197 assertions green under the strict flags · PHPStan level 6 clean · `composer validate` valid (its `version`-field warning predates these changes) / 严格开关下 98 项测试 · 197 条断言全绿 · PHPStan level 6 无错 · `composer validate` 通过（其 `version` 字段警告早于本次改动）

@@ -225,7 +225,7 @@ class Profile extends AbstractResource
 {
     public function GET(Request $request): Response
     {
-        $tpl = $this->service('template');
+        $tpl = $this->resolve('template');
         $html = $tpl->render('user/profile', ['name' => 'Alice']);
         return Response::html($html);
     }
@@ -461,7 +461,7 @@ class Profile extends AbstractResource
 {
     public function GET(Request $request): Response
     {
-        $tpl = $this->service('template');
+        $tpl = $this->resolve('template');
         $html = $tpl->render('user/profile', ['name' => 'Alice']);
         return Response::html($html);
     }

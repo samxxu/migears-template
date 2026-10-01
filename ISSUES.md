@@ -17,18 +17,19 @@ Legend — **P0** functional or security · **P1** documentation that fails when
 
 | | |
 |---|---|
-| Unsettled | P0 0 · P1 0 · P2 0 · P3 3 · other 0 |
-| Settled | 0 of 3 |
-| Waiting on the owner | `P3-1`, `P3-2`, `P3-3` |
-| Waiting on the reviewer | _nothing_ |
+| Unsettled | P0 0 · P1 0 · P2 1 · P3 1 · other 0 |
+| Settled | 2 of 4 |
+| Waiting on the owner | `P3-3` |
 | Waiting on the coordinator | _nothing_ |
+| Waiting on the reviewer | `P3-4` |
 | Deferred, owing nobody | _nothing_ |
 
 | id | level | status | title |
 |---|---|---|---|
-| [`P3-1`](issues/P3-1.md) | P3 | **open** | Layouts are single-level: a layout template calling `extends()` again … |
-| [`P3-2`](issues/P3-2.md) | P3 | **open** | `component()` forces `$this->layout` to null for the duration and … |
-| [`P3-3`](issues/P3-3.md) | P3 | **open** | The `## section(...) ##` special case only recognises a single-line … |
+| [`P3-3`](issues/P3-3.md) | P2 | **accepted** | When a ## section('name') ## block is not recognized (e.g. typo or … |
+| [`P3-1`](issues/P3-1.md) | P3 | **verified** | Layouts are single-level: a layout template calling `extends()` again … |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | `component()` forces `$this->layout` to null for the duration and … |
+| [`P3-4`](issues/P3-4.md) | P3 | **fixed** | `render()` is not reentrant: a template that calls … |
 
 ## Unclosed
 
@@ -37,15 +38,14 @@ highest severity first. `waiting on` is the party who acts next, read from that 
 
 | | |
 |---|---|
-| Unclosed | **3** of 3 |
-| By status | `open` 3 |
-| Waiting on | owner 3 |
+| Unclosed | **2** of 4 |
+| By status | `accepted` 1 · `fixed` 1 |
+| Waiting on | owner 1 · reviewer 1 |
 
 | level | item | status | waiting on | title |
 |---|---|---|---|---|
-| **P3** | [`P3-1`](issues/P3-1.md) | `open` | owner | Layouts are single-level: a layout template calling `extends()` again … |
-| **P3** | [`P3-2`](issues/P3-2.md) | `open` | owner | `component()` forces `$this->layout` to null for the duration and … |
-| **P3** | [`P3-3`](issues/P3-3.md) | `open` | owner | The `## section(...) ##` special case only recognises a single-line … |
+| **P2** | [`P3-3`](issues/P3-3.md) | `accepted` | owner | When a ## section('name') ## block is not recognized (e.g. typo or … |
+| **P3** | [`P3-4`](issues/P3-4.md) | `fixed` | reviewer | `render()` is not reentrant: a template that calls … |
 
 ## Verdict
 
@@ -86,18 +86,19 @@ No test for template with undefined variable (what happens with strict_types); n
 
 | | |
 |---|---|
-| 未了结 | P0 0 · P1 0 · P2 0 · P3 3 · 其他 0 |
-| 已了结 | 0 / 3 |
-| 等负责人 | `P3-1`, `P3-2`, `P3-3` |
-| 等评审方 | _无_ |
+| 未了结 | P0 0 · P1 0 · P2 1 · P3 1 · 其他 0 |
+| 已了结 | 2 / 4 |
+| 等模块主 | `P3-3` |
 | 等协调人 | _无_ |
+| 等评审方 | `P3-4` |
 | 已暂缓，不欠谁 | _无_ |
 
 | id | 级别 | 状态 | 标题 |
 |---|---|---|---|
-| [`P3-1`](issues/P3-1.md) | P3 | **open** | 布局只有一层：布局模板再次 extends() 不生效也无提示；层级上限未文档化。 |
-| [`P3-2`](issues/P3-2.md) | P3 | **open** | component() 在渲染期间强制把 $this->layout 置 null 并在 finally 还原，因此组件模板若调用 … |
-| [`P3-3`](issues/P3-3.md) | P3 | **open** | ## section(...) ## 特判只识别单行引号字面量。section 名含换行时正则不匹配，整个表达式退化为 <?= … |
+| [`P3-3`](issues/P3-3.md) | P2 | **accepted** | 当 ## section('name') ## 块未被识别时（如拼写错误或语法不对），生成的原始 PHP 代码会把 section() … |
+| [`P3-1`](issues/P3-1.md) | P3 | **verified** | 布局只有一层：布局模板再次 extends() 不生效也无提示；层级上限未文档化。 |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | component() 在渲染期间强制把 $this->layout 置 null 并在 finally 还原，因此组件模板若调用 … |
+| [`P3-4`](issues/P3-4.md) | P3 | **fixed** | `render()` 不可重入：模板调用 `$this->render('inner')` 会重置外层渲染的 `sections` 与 … |
 
 ## 未关闭
 
@@ -106,15 +107,14 @@ No test for template with undefined variable (what happens with strict_types); n
 
 | | |
 |---|---|
-| 未关闭 | **3** / 3 |
-| 按状态 | `open` 3 |
-| 等在谁 | 负责人 3 |
+| 未关闭 | **2** / 4 |
+| 按状态 | `accepted` 1 · `fixed` 1 |
+| 等在谁 | 模块主 1 · 评审方 1 |
 
 | 级别 | 条目 | 状态 | 等在谁 | 标题 |
 |---|---|---|---|---|
-| **P3** | [`P3-1`](issues/P3-1.md) | `open` | 负责人 | 布局只有一层：布局模板再次 extends() 不生效也无提示；层级上限未文档化。 |
-| **P3** | [`P3-2`](issues/P3-2.md) | `open` | 负责人 | component() 在渲染期间强制把 $this->layout 置 null 并在 finally 还原，因此组件模板若调用 … |
-| **P3** | [`P3-3`](issues/P3-3.md) | `open` | 负责人 | ## section(...) ## 特判只识别单行引号字面量。section 名含换行时正则不匹配，整个表达式退化为 <?= … |
+| **P2** | [`P3-3`](issues/P3-3.md) | `accepted` | 模块主 | 当 ## section('name') ## 块未被识别时（如拼写错误或语法不对），生成的原始 PHP 代码会把 section() … |
+| **P3** | [`P3-4`](issues/P3-4.md) | `fixed` | 评审方 | `render()` 不可重入：模板调用 `$this->render('inner')` 会重置外层渲染的 `sections` 与 … |
 
 ## 结论
 

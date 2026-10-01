@@ -20,6 +20,22 @@ PHP itself is already a template language. miGears Template adds just a few thin
 - **Multiple template paths** — theme support, override by adding paths
 - **Zero dependencies** — just PHP 8.1+
 
+## Boundaries
+
+**In scope**
+
+- Rendering a template to a string: `render()` / `exists()`, for both native `.php` templates and `## ##` `.tpl.php` templates, with `e()` for escaped output and `raw()` for raw output.
+- Layout inheritance (`extends()` / `start()` / `end()` / `section()`, single-level) and self-contained view components (`component()`).
+- The `## ##` syntax sugar and its compiler (`TemplateCompiler`): `## $expr ##` → escaped, `### $expr ###` → raw, `## section('name') ##` → section, compiled to a pure-PHP cache file; plus the `bin/compile.php` CLI for manual or debug compilation.
+- Multiple template directories with theme override (`addPath()`, searched in reverse order), with template-name resolution confined to those registered roots.
+
+**Not in scope (by design)**
+
+- Page structure and routing — this engine renders a template you name; the page vocabulary and turning a page declaration into `.tpl.php` belong to `migears/pages` (which in turn leaves routing to the front-end framework you pair it with).
+- No template-level DSL — control structures (`if` / `foreach` / `for` / `while`) use native PHP tags, not `{% %}`-style syntax.
+- No sandbox — a template is PHP code and runs with the full privileges of the process.
+- No built-in i18n — translation belongs to `migears/i18n`.
+
 ## Installation
 
 ```bash
@@ -79,6 +95,8 @@ Use `.tpl.php` extension for the `## ##` syntax — auto-compiled to pure PHP at
 | `\## … \##` | literal `##` | Escaped hashes — a backslash before a run of two or more hashes keeps it literal |
 
 Control structures (`if`, `foreach`, `for`, `while`) use **native PHP tags** — this preserves IDE syntax highlighting, auto-completion, and error checking.
+
+A `## section(...) ##` block is recognised only as `section('name')` with a quoted literal name. Any other shape — a second argument, an empty or multi-line name, or a compound expression like `section('x') . 'y'` — is a **compile error naming the template and the line**, instead of reaching render time as a call to a global `section()`; write `$this->section(...)` inside `## ##` for any other form.
 
 **How it works:**
 1. `.tpl.php` files are compiled to pure PHP cache files on first render
@@ -155,6 +173,10 @@ One trap follows: `## $this->raw($expr) ##` is **escaped anyway**, because the s
 <?php $this->end() ?>
 ```
 
+Layouts are **single-level**: one render applies exactly one layout, the one the page itself asks for. A layout must not call `extends()` — if it does, that call is silently ignored (no warning) and the page is not wrapped a second time, so what renders is that layout's own output. The page front ends built on this engine (`migears-pages` and its XML/YAML siblings) follow the same one-level rule: each page emits a single `extends()`.
+
+A render is **isolated from the renders around it**. A template may call `$this->render('partial')` to nest one render inside another, or inside a section it is currently capturing: the nested call neither reads the outer render's sections and layout nor leaves its own behind, and the outer state is put back even when the nested template throws. That is what keeps a failure deep inside a partial from taking the page's own sections down with it.
+
 ### View Components
 
 ```php
@@ -172,6 +194,8 @@ One trap follows: `## $this->raw($expr) ##` is **escaped anyway**, because the s
     'body' => 'Hello world',
 ]) ?>
 ```
+
+A component is **self-contained**: it is a fragment, not a page. It neither reads the sections captured around it nor applies a layout — an `extends()` call inside a component is silently ignored (no warning), and the component's own sections are isolated from its caller's. To render a full page use `render('...')`, not `component('...')`.
 
 ### Multiple Paths (Theme Support)
 
@@ -256,6 +280,22 @@ PHP 本身就是模板语言。miGears Template 只在之上加了几件事：**
 - **多模板目录** — 支持主题，通过添加路径覆盖模板
 - **零依赖** — 只需要 PHP 8.1+
 
+## 边界
+
+**范围内**
+
+- 把模板渲染成字符串：`render()` / `exists()`，原生 `.php` 模板与 `## ##` 的 `.tpl.php` 模板都支持，用 `e()` 转义输出、`raw()` 原样输出。
+- 布局继承（`extends()` / `start()` / `end()` / `section()`，只有一层）与自包含的视图组件（`component()`）。
+- `## ##` 语法糖及其编译器（`TemplateCompiler`）：`## $expr ##` → 转义、`### $expr ###` → 原样、`## section('name') ##` → 区块，编译为纯 PHP 缓存文件；以及用于手动/调试编译的 `bin/compile.php` CLI。
+- 多模板目录与主题覆盖（`addPath()`，按逆序查找），模板名只在已注册的根内解析。
+
+**范围外（刻意不做）**
+
+- 页面结构与路由 —— 本引擎只渲染你指定名字的模板；页面词汇表、把页面声明编译成 `.tpl.php` 属于 `migears/pages`（它又把路由留给与之搭配的前端框架）。
+- 没有模板级 DSL —— 控制结构（`if` / `foreach` / `for` / `while`）用原生 PHP 标签，而非 `{% %}` 式语法。
+- 没有沙箱 —— 模板就是 PHP 代码，以进程的完整权限运行。
+- 没有内置国际化 —— 翻译属于 `migears/i18n`。
+
 ## 安装
 
 ```bash
@@ -315,6 +355,8 @@ echo $tpl->render('user/profile', [
 | `\## … \##` | 字面 `##` | 转义井号——反斜杠加两个及以上井号，保持字面 |
 
 控制结构（`if`、`foreach`、`for`、`while`）使用**原生 PHP 标签** — 保留 IDE 语法高亮、自动补全和错误检查。
+
+`## section(...) ##` 块只认带引号字面量名字的 `section('name')`。其余任何形态——多一个参数、空名字或多行名字、或 `section('x') . 'y'` 这样的复合表达式——都是**编译期错误并指名模板与行号**，不会拖到渲染期变成一次对全局 `section()` 的调用；其它写法请在 `## ##` 里写 `$this->section(...)`。
 
 **工作原理：**
 1. `.tpl.php` 文件首次渲染时编译为纯 PHP 缓存文件
@@ -391,6 +433,10 @@ php vendor/bin/compile.php views/ cache/
 <?php $this->end() ?>
 ```
 
+布局只有**一层**：一次渲染只应用一个布局，即页面自身要求的那个。布局不得调用 `extends()`——若调用了，该调用会被静默忽略（无提示），页面不会被再包一层，最终渲染的就是该布局自身的输出。构建在本引擎之上的页面前端（`migears-pages` 及其 XML/YAML 同族）遵循同样的一层规则：每个页面只发出一次 `extends()`。
+
+一次渲染与它周围的渲染**相互隔离**。模板可以调用 `$this->render('partial')`，把一次渲染嵌进另一次渲染，或嵌进它此刻正在捕获的区块里：被嵌套的那次既不读取外层渲染的区块与布局，也不会把自己的留在外面；即使被嵌套的模板抛异常，外层状态也会归位。正是这一点，让片段深处的失败不会顺手带走页面自己的区块。
+
 ### 视图组件
 
 ```php
@@ -408,6 +454,8 @@ php vendor/bin/compile.php views/ cache/
     'body' => '你好，世界',
 ]) ?>
 ```
+
+组件是**自包含**的：它是片段，不是页面。它既不读取外层捕获的区块，也不应用布局——组件内部的 `extends()` 调用会被静默忽略（无提示），组件自身的区块与调用方相互隔离。要渲染完整页面请用 `render('...')`，而不是 `component('...')`。
 
 ### 多目录（主题支持）
 

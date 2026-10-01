@@ -179,11 +179,81 @@ class TemplateTest extends TestCase
         $this->assertStringContainsString('<p>Trusted bio</p>', $html);
     }
 
+    public function testANestedRenderKeepsTheOuterLayoutAndSections(): void
+    {
+        // The outer template nests a render after capturing its sections. render() used to clear the sections
+        // and the layout outright, so the outer layout was silently not applied and the page came back with
+        // the inner template's output alone.
+        // 外层模板在捕获自己的 sections 之后嵌了一次渲染。render() 此前会把 sections 与 layout 直接清空，
+        // 于是外层的 layout 被无声地不套用，页面只带着内层模板的输出返回。
+        $html = $this->tpl->render('nested/outer');
+
+        $this->assertStringContainsString('Layout Header', $html);
+        $this->assertStringContainsString('<title>', $html);
+        $this->assertStringContainsString('Outer title', $html);
+        $this->assertStringContainsString('<p>Outer content</p>', $html);
+    }
+
+    public function testANestedRenderInsideASectionCaptureKeepsTheOuterSection(): void
+    {
+        // The same nesting from inside a section capture: clearing the stack made the outer end() report
+        // "end() called without a matching start()", so the page failed instead of rendering.
+        // 同样的嵌套发生在 section 捕获内部：清空栈会让外层的 end() 报出「end() called without a matching
+        // start()」，整页因此报错，而不是渲染出来。
+        $html = $this->tpl->render('nested/in-section');
+
+        // The inner render's output sits inside the outer section's brackets, which is what shows the outer
+        // capture survived and closed normally. The fixture's own trailing newline is why the two halves are
+        // asserted apart rather than as one string.
+        // 内层渲染的输出落在外层 section 的方括号之间，这正说明外层的捕获保住了、也正常闭合了。夹具自带的
+        // 结尾换行，就是这两半分开断言、而不是拼成一个字符串的原因。
+        $this->assertStringContainsString('Layout Header', $html);
+        $this->assertStringContainsString('A[<p>Inner: INSIDE</p>', $html);
+        $this->assertStringContainsString(']B', $html);
+    }
+
+    public function testAFailingInnerRenderIsIsolatedFromTheOuterOne(): void
+    {
+        // A nested render that throws must leave the outer render's own state where it was, or the outer
+        // template cannot catch the failure and carry on: without the restore, its end() meets an empty stack
+        // and the page dies for an unrelated reason.
+        // 嵌套的渲染抛异常时，必须把外层渲染自己的状态留在原处，否则外层模板无法捕获失败后继续：没有还原的话，
+        // 它的 end() 会撞上一个空栈，整页会因为一个不相干的理由倒掉。
+        $html = $this->tpl->render('nested/rescue');
+
+        $this->assertStringContainsString('caught: inner render blew up', $html);
+        $this->assertStringContainsString('Layout Header', $html);
+    }
+
     public function testSectionWithDefaultValue(): void
     {
         $tpl = new Template($this->fixtures);
         $html = $tpl->render('layout/main');
         $this->assertStringContainsString('<title>Default Title</title>', $html);
+    }
+
+    public function testLayoutsAreSingleLevel(): void
+    {
+        // A layout that calls extends() again has that call silently ignored: the
+        // one-level rule is documented in the README, and it is pinned here so a
+        // future change cannot turn it into nesting — or into a silently empty
+        // page — without a test going red.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/outer.php', 'OUTER[<?= $this->section("body", "none") ?>]');
+        file_put_contents($dir . '/middle.php', '<?php $this->extends("outer") ?>MID[<?= $this->section("body", "none") ?>]');
+        file_put_contents($dir . '/child.php', '<?php $this->extends("middle") ?><?php $this->start("body") ?>CHILD<?php $this->end() ?>');
+
+        try {
+            $html = (new Template($dir))->render('child');
+            $this->assertSame('MID[CHILD]', $html);
+            $this->assertStringNotContainsString('OUTER', $html);
+        } finally {
+            unlink($dir . '/outer.php');
+            unlink($dir . '/middle.php');
+            unlink($dir . '/child.php');
+            rmdir($dir);
+        }
     }
 
     // --- Cache directory ---
@@ -231,6 +301,31 @@ class TemplateTest extends TestCase
 
         $this->assertStringContainsString('&lt;b&gt;XSS&lt;/b&gt;', $html);
         $this->assertStringNotContainsString('<b>XSS</b>', $html);
+    }
+
+    public function testComponentIgnoresItsOwnLayout(): void
+    {
+        // A component is a self-contained fragment: an extends() inside it is
+        // silently ignored (the missing layout is never even looked up), and it
+        // must not disturb the layout of the render it was called from. Both
+        // halves of that promise are pinned here.
+        $dir = sys_get_temp_dir() . '/migears_template_' . uniqid();
+        mkdir($dir, 0755, true);
+        file_put_contents($dir . '/layout.php', 'L[<?= $this->section("body", "none") ?>]');
+        file_put_contents($dir . '/parent.php', '<?php $this->extends("layout") ?><?php $this->start("body") ?>[<?= $this->component("comp") ?>]<?php $this->end() ?>');
+        file_put_contents($dir . '/comp.php', '<?php $this->extends("elsewhere") ?>FRAG');
+
+        $tpl = new Template($dir);
+
+        try {
+            $this->assertSame('FRAG', $tpl->component('comp'));
+            $this->assertSame('L[[FRAG]]', $tpl->render('parent'));
+        } finally {
+            unlink($dir . '/layout.php');
+            unlink($dir . '/parent.php');
+            unlink($dir . '/comp.php');
+            rmdir($dir);
+        }
     }
 
     // --- Multiple paths (theme support) ---

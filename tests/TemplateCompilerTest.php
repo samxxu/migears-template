@@ -166,6 +166,57 @@ class TemplateCompilerTest extends TestCase
         $this->assertSame(0, $code, 'the compiled artefact is not parseable PHP: ' . implode(' ', $output));
     }
 
+    public function testUnrecognisedSectionFormFailsAtCompileTime(): void
+    {
+        // ## section($x) ## used to compile to a call to a global section() and only
+        // fail at render time with "Call to undefined function section()", naming
+        // neither the template nor the line.
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/section/');
+        $this->compiler->compile('## section($x) ##');
+    }
+
+    public function testSectionWithASecondArgumentIsRefusedRatherThanMangled(): void
+    {
+        // This shape used to match the sugar's pattern and compile to
+        // $this->section('content\', \'fallback'): the name became
+        // "content', 'fallback" and the default was dropped — a silent wrong result.
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/section/');
+        $this->compiler->compile("## section('content', 'fallback') ##");
+    }
+
+    public function testSectionWithAnEmptyNameIsRefused(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->compiler->compile("## section('') ##");
+    }
+
+    public function testSectionCompileErrorNamesTheLine(): void
+    {
+        try {
+            $this->compiler->compile("<p>ok</p>\n## section(\$x) ##");
+            $this->fail('an unrecognised section() form should not compile');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('line 2', $e->getMessage());
+        }
+    }
+
+    public function testSectionCompileErrorNamesTheTemplateFile(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'tpl_sec_') . '.tpl.php';
+        file_put_contents($file, "## section('x') . 'y' ##");
+
+        try {
+            $this->compiler->compileFile($file);
+            $this->fail('an unrecognised section() form should not compile');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString($file, $e->getMessage());
+        } finally {
+            unlink($file);
+        }
+    }
+
     // --- Native PHP preserved ---
 
     public function testNativePhpTagsPreserved(): void

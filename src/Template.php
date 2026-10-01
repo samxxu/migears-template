@@ -101,26 +101,45 @@ class Template
             throw new \RuntimeException("Template not found: {$template}");
         }
 
-        // Reset per-render state
+        // Save, clear and restore rather than only clear, the way component() already does. A template may
+        // call `$this->render('inner')` to nest one render inside another, and clearing alone threw the outer
+        // render's captured sections and its layout away: with the nest after the sections were captured the
+        // layout was silently not applied, and with the nest inside a section capture the outer end() reported
+        // "end() called without a matching start()". The finally is what puts the outer state back even when
+        // the inner template throws, so one bad render cannot poison the next one either.
+        // 采用「保存／清空／还原」，与 component() 已有的做法一致。模板可以调用 `$this->render('inner')` 把一次
+        // 渲染嵌进另一次，而只清空会把外层已捕获的 sections 与它的 layout 一并丢掉：嵌套发生在 sections 捕获
+        // 之后时，layout 会被无声地不套用；嵌套发生在 section 捕获内部时，外层的 end() 会报「end() called
+        // without a matching start()」。finally 则保证内层模板抛异常时外层状态也会归位，一次坏渲染因此也不会
+        // 毒害下一次。
+        $outerLayout = $this->layout;
+        $outerSections = $this->sections;
+        $outerStack = $this->sectionStack;
         $this->layout = null;
         $this->sections = [];
         $this->sectionStack = [];
 
-        $content = $this->evaluate($file, $data);
+        try {
+            $content = $this->evaluate($file, $data);
 
-        // If a layout was set, render the layout with captured sections
-        /** @var string|null $layout Set by the template via extends(), which evaluate() includes at runtime. */
-        $layout = $this->layout;
-        if ($layout !== null) {
-            $layoutFile = $this->findTemplate($layout);
-            if ($layoutFile === null) {
-                throw new \RuntimeException("Layout template not found: {$layout}");
+            // If a layout was set, render the layout with captured sections
+            /** @var string|null $activeLayout Set by the template via extends(), which evaluate() includes at runtime. */
+            $activeLayout = $this->layout;
+            if ($activeLayout !== null) {
+                $layoutFile = $this->findTemplate($activeLayout);
+                if ($layoutFile === null) {
+                    throw new \RuntimeException("Layout template not found: {$activeLayout}");
+                }
+                // The layout uses section() to output sections
+                $content = $this->evaluate($layoutFile, $data);
             }
-            // The layout uses section() to output sections
-            $content = $this->evaluate($layoutFile, $data);
-        }
 
-        return $content;
+            return $content;
+        } finally {
+            $this->layout = $outerLayout;
+            $this->sections = $outerSections;
+            $this->sectionStack = $outerStack;
+        }
     }
 
     /**

@@ -20,8 +20,11 @@ class TemplateCompiler
 {
     /**
      * Compile template source into PHP code.
+     *
+     * $template is the source's path when there is one; it is used only to name
+     * the file in a compile error.
      */
-    public function compile(string $source): string
+    public function compile(string $source, ?string $template = null): string
     {
         // A backslash before a run of two or more hashes escapes it: \## is a literal
         // ##, \### a literal ###. Mask those runs first — the passes below are text-level
@@ -59,20 +62,48 @@ class TemplateCompiler
         );
 
         // ## $expr ## — escaped output
+        $escaped = $source;
+        $count = 0;
         $source = preg_replace_callback(
             '/##\s*(.+?)\s*##/s',
-            function (array $m): string {
-                $expr = $m[1];
+            /** @param array<int, array{0: string, 1: int}> $m */
+            function (array $m) use ($template, $escaped): string {
+                // The PREG_OFFSET_CAPTURE flag below makes each match [text, offset];
+                // the offset is what turns into a line number for the error further down.
+                $expr = $m[1][0];
+                $offset = $m[1][1];
                 // ## section('name') ## → section('name'). The name is author text,
                 // so it is written out as a PHP literal the way the parser would
                 // read it: splicing it between two quote characters let a name like
-                // a') . system('id') . ('b close the string and run as code.
-                if (preg_match('/^section\(\s*["\'](.+?)["\']\s*\)$/i', $expr, $secMatch)) {
+                // a') . system('id') . ('b close the string and run as code. The name
+                // is one quoted literal on one line — a second argument, an empty
+                // name or an embedded newline is not this sugar, and the branch below
+                // refuses those instead of reading the punctuation off as the name.
+                if (preg_match('/^section\(\s*\'([^\'\\\\\r\n]+)\'\s*\)$/i', $expr, $secMatch)) {
                     return '<?= $this->section(' . var_export($secMatch[1], true) . ') ?>';
+                }
+                if (preg_match('/^section\(\s*"([^"\\\\\r\n]+)"\s*\)$/i', $expr, $secMatch)) {
+                    return '<?= $this->section(' . var_export($secMatch[1], true) . ') ?>';
+                }
+                // Any other bare section(...) is neither the sugar nor a call that can
+                // resolve: section() is a method, so writing it out as a global
+                // function reached render time as "Call to undefined function", with
+                // nothing pointing at the template. Refuse it here instead, naming the
+                // file and the line while the author can still see the mistake.
+                if (preg_match('/^section\s*\(/i', $expr)) {
+                    $line = substr_count($escaped, "\n", 0, $offset) + 1;
+                    $where = $template !== null ? "in {$template} on line {$line}" : "on line {$line}";
+                    throw new \RuntimeException(
+                        "Unrecognised section() form {$where}: the ## ## sugar is section('name')"
+                        . ' with a quoted literal; write $this->section(...) for anything else'
+                    );
                 }
                 return "<?= \$this->e({$expr}) ?>";
             },
-            $source
+            $source,
+            -1,
+            $count,
+            PREG_OFFSET_CAPTURE
         );
 
         foreach ($literals as $index => $hashes) {
@@ -99,7 +130,7 @@ class TemplateCompiler
             throw new \RuntimeException("Failed to read template: {$path}");
         }
 
-        return $this->compile($source);
+        return $this->compile($source, $path);
     }
 
     /**
